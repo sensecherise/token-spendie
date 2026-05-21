@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import Combine
 
 /// Manages the menu bar status item and its detail popover.
 @MainActor
@@ -7,6 +8,8 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
     private let store: UsageStore
     private let onOpenSettings: () -> Void
     private var statusItem: NSStatusItem?
+    private var hostView: NSHostingView<MenuBarLabel>?
+    private var sizeObserver: AnyCancellable?
     private let popover = NSPopover()
 
     init(store: UsageStore, onOpenSettings: @escaping () -> Void) {
@@ -22,6 +25,7 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
         guard let button = item.button else { return }
 
         let host = NSHostingView(rootView: MenuBarLabel(store: store))
+        host.sizingOptions = [.intrinsicContentSize]
         host.translatesAutoresizingMaskIntoConstraints = false
         button.addSubview(host)
         NSLayoutConstraint.activate([
@@ -46,12 +50,32 @@ final class MenuBarController: NSObject, NSPopoverDelegate {
             )
         )
         self.statusItem = item
+        self.hostView = host
+
+        // `variableLength` only measures the button's image/title, not a hosted
+        // SwiftUI view — so the status item width must be set explicitly and
+        // refreshed whenever the label's content (and thus its size) changes.
+        updateStatusItemWidth()
+        sizeObserver = store.objectWillChange.sink { [weak self] _ in
+            DispatchQueue.main.async { self?.updateStatusItemWidth() }
+        }
     }
 
     /// Removes the status item.
     func remove() {
+        sizeObserver?.cancel()
+        sizeObserver = nil
+        hostView = nil
         if let statusItem { NSStatusBar.system.removeStatusItem(statusItem) }
         statusItem = nil
+    }
+
+    /// Sizes the status item to the current fitting width of the hosted label.
+    private func updateStatusItemWidth() {
+        guard let statusItem, let hostView else { return }
+        let width = hostView.fittingSize.width
+        guard width > 0 else { return }
+        statusItem.length = width
     }
 
     @objc private func togglePopover() {
