@@ -6,13 +6,10 @@ struct UsageBarRow: View {
     let subtitle: String
     let window: UsageWindow
     let resetLine: String
-    var dimmed: Bool = false
     var theme: Theme
 
     private var level: UsageLevel { UsageLevel.forPercent(window.percent) }
     private var tierColor: Color { theme.color(for: level) }
-    /// Stale data keeps its theme color, just faded — so the theme stays visible.
-    private var barColor: Color { tierColor.opacity(dimmed ? 0.45 : 1) }
     private var fraction: CGFloat { min(max(window.percent / 100, 0), 1) }
 
     var body: some View {
@@ -22,13 +19,13 @@ struct UsageBarRow: View {
                 Spacer()
                 Text("\(Int(window.percent.rounded()))%")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(barColor)
+                    .foregroundStyle(tierColor)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.primary.opacity(0.12))
                     Capsule()
-                        .fill(barColor)
+                        .fill(tierColor)
                         .frame(width: geo.size.width * fraction)
                 }
             }
@@ -80,21 +77,20 @@ struct DetailPanelView: View {
             Text("Loading usage…").font(.system(size: 12)).foregroundStyle(.secondary)
         default:
             if let snapshot = store.snapshot {
-                let dimmed = store.state == .stale
                 VStack(alignment: .leading, spacing: 13) {
                     UsageBarRow(title: "Session", subtitle: "5-hour window",
                                 window: snapshot.session,
                                 resetLine: "5-hour window · " + Formatting.resetCountdown(to: snapshot.session.resetsAt, now: Date()),
-                                dimmed: dimmed, theme: preferences.theme)
+                                theme: preferences.theme)
                     UsageBarRow(title: "Weekly", subtitle: "all models",
                                 window: snapshot.weekly,
                                 resetLine: "all models · " + Formatting.resetDate(snapshot.weekly.resetsAt),
-                                dimmed: dimmed, theme: preferences.theme)
+                                theme: preferences.theme)
                     ForEach(snapshot.modelWeeklies, id: \.model) { item in
                         UsageBarRow(title: "Weekly · \(item.model)", subtitle: item.model,
                                     window: item.window,
                                     resetLine: "\(item.model) only · " + Formatting.resetDate(item.window.resetsAt),
-                                    dimmed: dimmed, theme: preferences.theme)
+                                    theme: preferences.theme)
                     }
                 }
             }
