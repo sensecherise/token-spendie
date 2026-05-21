@@ -172,10 +172,11 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(provider.callCount, 2, "a manual refresh after the gap runs")
     }
 
-    func testManualRefreshSkippedDuringRateLimitBackoff() async {
+    func testManualRefreshBypassesRateLimitBackoff() async {
         var clock = Date(timeIntervalSince1970: 0)
         let provider = StubProvider([.success(snapshot(30)),
-                                     .failure(ProviderError.rateLimited(retryAfter: 600))])
+                                     .failure(ProviderError.rateLimited(retryAfter: 600)),
+                                     .success(snapshot(45))])
         let store = makeStore(credentials: StubCredentials(.success(creds())),
                               provider: provider, now: { clock })
         await store.manualRefresh()                       // success
@@ -183,8 +184,46 @@ final class UsageStoreTests: XCTestCase {
         await store.manualRefresh()                       // 429 — backoff begins
         let callsAfter429 = provider.callCount
         clock = Date(timeIntervalSince1970: 6)
-        await store.manualRefresh()                       // past the gap, but backoff still blocks it
+        await store.manualRefresh()                       // backoff active — a manual refresh still fetches
+        XCTAssertEqual(provider.callCount, callsAfter429 + 1,
+                       "a manual refresh bypasses 429 backoff")
+        XCTAssertEqual(store.snapshot?.session.percent, 45,
+                       "the bypassing refresh applied fresh data")
+        XCTAssertEqual(store.state, .ok,
+                       "a successful manual refresh clears the degraded state")
+    }
+
+    func testAutomaticRefreshStillHonorsRateLimitBackoff() async {
+        var clock = Date(timeIntervalSince1970: 0)
+        let provider = StubProvider([.success(snapshot(30)),
+                                     .failure(ProviderError.rateLimited(retryAfter: 600))])
+        let store = makeStore(credentials: StubCredentials(.success(creds())),
+                              provider: provider, now: { clock })
+        await store.refreshNow()                          // success
+        clock = Date(timeIntervalSince1970: 3)
+        await store.refreshNow()                          // 429 — backoff begins
+        let callsAfter429 = provider.callCount
+        clock = Date(timeIntervalSince1970: 6)
+        await store.refreshNow()                          // automatic — must stay paused
         XCTAssertEqual(provider.callCount, callsAfter429,
-                       "a manual refresh during backoff makes no request")
+                       "an automatic refresh during backoff makes no request")
+    }
+
+    func testRateLimitedUntilReflectsBackoff() async {
+        var clock = Date(timeIntervalSince1970: 0)
+        let provider = StubProvider([.success(snapshot(30)),
+                                     .failure(ProviderError.rateLimited(retryAfter: 600)),
+                                     .success(snapshot(40))])
+        let store = makeStore(credentials: StubCredentials(.success(creds())),
+                              provider: provider, now: { clock })
+        await store.refreshNow()
+        XCTAssertNil(store.rateLimitedUntil, "not rate limited after a success")
+        clock = Date(timeIntervalSince1970: 1)
+        await store.refreshNow()                          // 429
+        XCTAssertEqual(store.rateLimitedUntil, Date(timeIntervalSince1970: 601),
+                       "rate limited until now + Retry-After")
+        clock = Date(timeIntervalSince1970: 2)
+        await store.manualRefresh()                       // bypasses backoff, succeeds
+        XCTAssertNil(store.rateLimitedUntil, "cleared after a successful refresh")
     }
 }

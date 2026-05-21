@@ -66,7 +66,7 @@ private struct RefreshButton: View {
     @State private var spinStart: Date?
 
     var body: some View {
-        Button(action: onRefresh) {
+        Button(action: tapped) {
             Image(systemName: "arrow.clockwise")
                 .font(.system(size: 11, weight: .semibold))
                 .rotationEffect(.degrees(spinning ? 360 : 0))
@@ -92,6 +92,16 @@ private struct RefreshButton: View {
         spinning
             ? .linear(duration: 1).repeatForever(autoreverses: false)
             : .linear(duration: 0.2)
+    }
+
+    /// Handles a click: spins immediately to acknowledge it, then triggers the
+    /// refresh. The spin is feedback for the *click*, so it runs even when the
+    /// refresh is throttled or in 429 backoff — cases where `store.isRefreshing`
+    /// never flips. A real fetch, if one runs, extends the spin via `onChange`.
+    private func tapped() {
+        onRefresh()
+        startSpin()
+        stopSpinAfterMinimum()
     }
 
     private func startSpin() {
@@ -247,6 +257,10 @@ struct DetailPanelView: View {
     private var statusText: String {
         guard let snapshot = store.snapshot else { return " " }
         let ago = Formatting.updatedAgo(snapshot.fetchedAt, now: Date())
+        if let until = store.rateLimitedUntil {
+            let mins = max(1, Int((until.timeIntervalSinceNow / 60).rounded(.up)))
+            return "rate limited — retry in \(mins)m"
+        }
         return store.state == .stale ? "offline — \(ago)" : ago
     }
 }

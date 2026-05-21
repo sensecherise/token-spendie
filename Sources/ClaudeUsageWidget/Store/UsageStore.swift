@@ -80,8 +80,10 @@ final class UsageStore: ObservableObject {
     }
 
     /// Performs one refresh cycle: load credentials, fetch, retry once on 401.
-    func refreshNow() async {
-        if let backoffUntil, now() < backoffUntil { return }
+    /// `ignoringBackoff` lets a user-initiated refresh proceed during 429
+    /// backoff; automatic callers leave it `false` so polling stays paused.
+    func refreshNow(ignoringBackoff: Bool = false) async {
+        if !ignoringBackoff, let backoffUntil, now() < backoffUntil { return }
         isRefreshing = true
         defer { isRefreshing = false }
         if snapshot == nil { state = .loading }
@@ -127,7 +129,17 @@ final class UsageStore: ObservableObject {
         // while this refresh is still in flight is dropped by `isRefreshing`,
         // not the gap — both guards are needed to keep the button un-spammable.
         lastManualRefresh = now()
-        await refreshNow()
+        // Bypass 429 backoff: the user is explicitly asking, the endpoint may
+        // have recovered, and the 2s gap above already caps the request rate.
+        await refreshNow(ignoringBackoff: true)
+    }
+
+    /// When the endpoint is rate-limiting us (HTTP 429), the time the limit
+    /// resets; `nil` otherwise. Lets the status line show "rate limited"
+    /// instead of "offline" — a 429 is not an outage.
+    var rateLimitedUntil: Date? {
+        guard let backoffUntil, now() < backoffUntil else { return nil }
+        return backoffUntil
     }
 
     /// Call when a display surface opens or closes; the poll interval tightens
