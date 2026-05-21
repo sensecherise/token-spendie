@@ -112,6 +112,8 @@ struct DetailPanelView: View {
                 return ("📡", "Can't reach the usage service. The widget will keep retrying.")
             case .badResponse:
                 return ("⚠️", "Couldn't read usage data. The usage source returned something unexpected — the widget will keep retrying.")
+            case .noManualToken:
+                return ("🔑", "No token saved. Open Settings, choose Manual, and paste a token from `claude setup-token`.")
             }
         }()
         return HStack(alignment: .top, spacing: 8) {

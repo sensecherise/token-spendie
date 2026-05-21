@@ -79,7 +79,7 @@ final class UsageStore: ObservableObject {
         } catch ProviderError.badResponse {
             degrade(to: .badResponse)
         } catch CredentialError.notFound, CredentialError.malformed {
-            state = .error(.claudeCodeNotFound)
+            state = .error(preferences.credentialMode == .manual ? .noManualToken : .claudeCodeNotFound)
         } catch CredentialError.accessDenied {
             state = .error(.keychainAccessDenied)
         } catch {

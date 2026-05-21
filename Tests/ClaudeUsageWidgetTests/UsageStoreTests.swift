@@ -97,4 +97,21 @@ final class UsageStoreTests: XCTestCase {
         await store.refreshNow()
         XCTAssertEqual(store.state, .error(.network))
     }
+
+    func testManualModeMissingTokenSurfacesNoManualToken() async {
+        let prefsDefaults = UserDefaults(suiteName: UUID().uuidString)!
+        let preferences = Preferences(defaults: prefsDefaults)
+        preferences.credentialMode = .manual
+        let url = FileManager.default.temporaryDirectory
+            .appendingPathComponent("store-\(UUID().uuidString).json")
+        let store = UsageStore(
+            provider: StubProvider([.success(snapshot(1))]),
+            credentials: StubCredentials(.failure(CredentialError.notFound)),
+            cache: SnapshotCache(fileURL: url),
+            preferences: preferences,
+            now: { Date(timeIntervalSince1970: 0) }
+        )
+        await store.refreshNow()
+        XCTAssertEqual(store.state, .error(.noManualToken))
+    }
 }

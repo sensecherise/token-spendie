@@ -29,6 +29,7 @@ enum UsageError: Error, Equatable {
     case loginExpired           // 401 even after re-reading the Keychain
     case network                // offline / unreachable
     case badResponse            // non-200 or unparseable payload
+    case noManualToken          // manual mode selected but no token saved
 }
 
 /// What the data layer's provider/decoder can throw.
