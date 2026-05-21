@@ -19,6 +19,9 @@ final class UsageStore: ObservableObject {
     private var panelVisible = false
     private var lastSuccess: Date?
     private let pathMonitor = NWPathMonitor()
+    /// Last known network reachability, used to detect reconnect transitions.
+    /// Main-actor isolated — only touched inside the `@MainActor` task below.
+    private var networkWasSatisfied = true
     private static let panelOpenInterval: TimeInterval = 20
 
     init(provider: UsageProvider,
@@ -128,14 +131,22 @@ final class UsageStore: ObservableObject {
     }
 
     private func observeNetwork() {
-        var wasSatisfied = true
+        // The handler runs on a background queue. It captures only `[weak self]`
+        // and hops to the main actor before touching any state, so there is no
+        // shared mutable variable crossing threads.
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let satisfied = path.status == .satisfied
-            defer { wasSatisfied = satisfied }
-            if satisfied && !wasSatisfied {
-                Task { @MainActor in await self?.refreshNow() }
+            Task { @MainActor in
+                guard let self else { return }
+                let reconnected = satisfied && !self.networkWasSatisfied
+                self.networkWasSatisfied = satisfied
+                if reconnected { await self.refreshNow() }
             }
         }
         pathMonitor.start(queue: DispatchQueue(label: "ClaudeUsage.network"))
+    }
+
+    deinit {
+        pathMonitor.cancel()
     }
 }
