@@ -32,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         floatingPanel = FloatingPanelController(store: store, preferences: preferences,
                                                onOpenSettings: { [weak self] in self?.showSettings() })
 
+        installEditMenu()
         applyDisplayPreferences()
         store.start()
 
@@ -48,6 +49,25 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             }
             .store(in: &cancellables)
+    }
+
+    /// Installs a minimal Edit menu. This app is an `LSUIElement` accessory app
+    /// with no visible menu bar, but without a main menu the standard
+    /// Cmd-X/C/V/A key equivalents have no route to the focused text field —
+    /// so the token field could not be pasted into. The menu stays hidden;
+    /// only its key equivalents matter.
+    @MainActor
+    private func installEditMenu() {
+        let mainMenu = NSMenu()
+        let editItem = NSMenuItem()
+        mainMenu.addItem(editItem)
+        let editMenu = NSMenu(title: "Edit")
+        editItem.submenu = editMenu
+        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
+        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
+        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
+        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
+        NSApp.mainMenu = mainMenu
     }
 
     /// Shows/hides each surface to match preferences.
