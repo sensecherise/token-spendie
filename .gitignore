@@ -1,3 +1,5 @@
 .superpowers/
 .DS_Store
 .build/
+build/
+Resources/AppIcon-1024.png
