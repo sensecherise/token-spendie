@@ -29,6 +29,8 @@ struct PreferencesView: View {
     let manualTokenStore: ManualTokenStore
     @State private var draftToken: String = ""
     @State private var tokenSaved: Bool = false
+    @State private var verifying: Bool = false
+    @State private var verifyStatus: String = ""
     var onDisplayChanged: () -> Void
     var onIntervalChanged: () -> Void
 
@@ -95,19 +97,19 @@ struct PreferencesView: View {
                     SecureField(tokenSaved ? "Paste a new token to replace" : "Paste token",
                                 text: $draftToken)
                     HStack {
-                        Button("Save token") {
-                            if (try? manualTokenStore.save(token: draftToken)) != nil {
-                                draftToken = ""
-                                tokenSaved = true
-                            }
-                        }
-                        .disabled(draftToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                        Button(verifying ? "Verifying…" : "Save & verify") { verifyAndSave() }
+                            .disabled(verifying
+                                || draftToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
                         if tokenSaved {
                             Button("Clear") {
                                 manualTokenStore.clear()
                                 tokenSaved = false
+                                verifyStatus = ""
                             }
                         }
+                    }
+                    if !verifyStatus.isEmpty {
+                        Text(verifyStatus).font(.system(size: 10)).foregroundStyle(.secondary)
                     }
                 }
             }
@@ -134,6 +136,33 @@ struct PreferencesView: View {
 
     private func swatch(_ color: Color) -> some View {
         RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 14, height: 14)
+    }
+
+    /// Verifies the pasted token against the usage endpoint, then saves it.
+    /// A token the server rejects is not saved; a token that can't be reached
+    /// (network failure) is saved but flagged as unverified.
+    private func verifyAndSave() {
+        let token = draftToken.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !token.isEmpty else { return }
+        verifying = true
+        verifyStatus = ""
+        Task { @MainActor in
+            do {
+                _ = try await EndpointUsageProvider().fetchUsage(accessToken: token)
+                try manualTokenStore.save(token: token)
+                draftToken = ""
+                tokenSaved = true
+                verifyStatus = "✓ Token verified and saved."
+            } catch ProviderError.unauthorized {
+                verifyStatus = "✗ The server rejected this token — not saved."
+            } catch {
+                try? manualTokenStore.save(token: token)
+                draftToken = ""
+                tokenSaved = manualTokenStore.hasToken
+                verifyStatus = "Saved, but couldn't verify (network?)."
+            }
+            verifying = false
+        }
     }
 
     private enum Surface { case menuBar, floating }
