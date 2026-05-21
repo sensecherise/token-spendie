@@ -4,8 +4,8 @@ import SwiftUI
 /// Color tier for a usage percentage.
 enum UsageLevel: Equatable {
     case calm   // < 70%
-    case warn   // 70–90%
-    case hot    // > 90%
+    case warn   // 70% to < 90%
+    case hot    // >= 90%
 
     static func forPercent(_ percent: Double) -> UsageLevel {
         if percent >= 90 { return .hot }
@@ -24,6 +24,14 @@ enum UsageLevel: Equatable {
 
 /// Pure string formatting for the UI.
 enum Formatting {
+    /// Cached formatter — `DateFormatter` is costly to allocate. Used only from
+    /// the main thread (SwiftUI rendering), so a single shared instance is safe.
+    private static let weekdayDateFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "EEE, MMM d"
+        return formatter
+    }()
+
     /// "resets in 2h 47m" / "resets in 40m" / "resetting now" / "" when unknown.
     static func resetCountdown(to date: Date?, now: Date) -> String {
         guard let date else { return "" }
@@ -38,9 +46,7 @@ enum Formatting {
     /// "resets Mon, May 25" — absolute date, used for weekly windows.
     static func resetDate(_ date: Date?) -> String {
         guard let date else { return "" }
-        let formatter = DateFormatter()
-        formatter.dateFormat = "EEE, MMM d"
-        return "resets \(formatter.string(from: date))"
+        return "resets \(weekdayDateFormatter.string(from: date))"
     }
 
     /// "updated just now" / "updated 10s ago" / "updated 5m ago" / "updated 2h ago".
