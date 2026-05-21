@@ -28,9 +28,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             preferences: preferences
         )
         menuBar = MenuBarController(store: store, preferences: preferences,
-                                   onOpenSettings: { [weak self] in self?.showSettings() })
+                                   onOpenSettings: { [weak self] in self?.showSettings() },
+                                   onQuit: { NSApp.terminate(nil) })
         floatingPanel = FloatingPanelController(store: store, preferences: preferences,
-                                               onOpenSettings: { [weak self] in self?.showSettings() })
+                                               onOpenSettings: { [weak self] in self?.showSettings() },
+                                               onQuit: { NSApp.terminate(nil) })
 
         installEditMenu()
         applyDisplayPreferences()

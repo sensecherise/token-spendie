@@ -12,16 +12,19 @@ final class MenuBarController: NSObject {
     private let store: UsageStore
     private let preferences: Preferences
     private let onOpenSettings: () -> Void
+    private let onQuit: () -> Void
     private var statusItem: NSStatusItem?
     private var storeObserver: AnyCancellable?
     private var themeObserver: AnyCancellable?
     private var panel: NSPanel?
     private var clickMonitor: Any?
 
-    init(store: UsageStore, preferences: Preferences, onOpenSettings: @escaping () -> Void) {
+    init(store: UsageStore, preferences: Preferences,
+         onOpenSettings: @escaping () -> Void, onQuit: @escaping () -> Void) {
         self.store = store
         self.preferences = preferences
         self.onOpenSettings = onOpenSettings
+        self.onQuit = onQuit
         super.init()
     }
 
@@ -117,10 +120,14 @@ final class MenuBarController: NSObject {
         let content = DetailPanelView(
             store: store,
             preferences: preferences,
-            onRefresh: { [weak self] in Task { await self?.store.refreshNow() } },
+            onRefresh: { [weak self] in Task { await self?.store.manualRefresh() } },
             onOpenSettings: { [weak self] in
                 self?.closePanel()
                 self?.onOpenSettings()
+            },
+            onQuit: { [weak self] in
+                self?.closePanel()
+                self?.onQuit()
             }
         )
         .background(.regularMaterial)
