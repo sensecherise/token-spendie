@@ -114,4 +114,18 @@ final class UsageStoreTests: XCTestCase {
         await store.refreshNow()
         XCTAssertEqual(store.state, .error(.noManualToken))
     }
+
+    func testRateLimitPausesPolling() async {
+        let provider = StubProvider([.success(snapshot(30)),
+                                     .failure(ProviderError.rateLimited(retryAfter: 600))])
+        let store = makeStore(credentials: StubCredentials(.success(creds())),
+                              provider: provider,
+                              now: { Date(timeIntervalSince1970: 0) })
+        await store.refreshNow()   // success — snapshot cached
+        await store.refreshNow()   // 429 — backoff begins
+        XCTAssertEqual(store.state, .stale)
+        let callsAfter429 = provider.callCount
+        await store.refreshNow()   // within the backoff window — must be skipped
+        XCTAssertEqual(provider.callCount, callsAfter429, "polling is paused during backoff")
+    }
 }

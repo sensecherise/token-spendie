@@ -25,6 +25,11 @@ struct EndpointUsageProvider: UsageProvider {
             return try UsageDecoder.decode(data, fetchedAt: now())
         case 401:
             throw ProviderError.unauthorized
+        case 429:
+            // Honor `Retry-After` (integer seconds) when present.
+            let retryAfter = response.value(forHTTPHeaderField: "Retry-After")
+                .flatMap { TimeInterval($0) }
+            throw ProviderError.rateLimited(retryAfter: retryAfter)
         default:
             throw ProviderError.badResponse
         }

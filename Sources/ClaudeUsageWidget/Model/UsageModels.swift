@@ -37,6 +37,7 @@ enum ProviderError: Error, Equatable {
     case unauthorized           // HTTP 401
     case network                // transport failure
     case badResponse            // non-200, or payload could not be decoded
+    case rateLimited(retryAfter: TimeInterval?)  // HTTP 429
 }
 
 /// The store's published display state.

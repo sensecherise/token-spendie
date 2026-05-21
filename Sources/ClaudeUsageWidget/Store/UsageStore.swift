@@ -28,6 +28,9 @@ final class UsageStore: ObservableObject {
     private var visiblePanels: Set<PanelSource> = []
     private var panelVisible: Bool { !visiblePanels.isEmpty }
     private var lastSuccess: Date?
+    /// While set and in the future, polling is paused — set after an HTTP 429.
+    private var backoffUntil: Date?
+    private var consecutiveRateLimits = 0
     private let pathMonitor = NWPathMonitor()
     /// Last known network reachability, used to detect reconnect transitions.
     /// Main-actor isolated — only touched inside the `@MainActor` task below.
@@ -50,18 +53,28 @@ final class UsageStore: ObservableObject {
     func start() {
         if let cached = cache.load() {
             snapshot = cached
-            state = .stale   // cached data is not yet confirmed live
+            // A recently-cached snapshot counts as live, so a relaunch needs no
+            // immediate fetch — this avoids request bursts across restarts.
+            if now().timeIntervalSince(cached.fetchedAt) < 60 {
+                state = .ok
+                lastSuccess = cached.fetchedAt
+            } else {
+                state = .stale
+            }
         }
         NotificationCenter.default.addObserver(
             self, selector: #selector(systemDidWake),
             name: NSWorkspace.didWakeNotification, object: nil)
         observeNetwork()
         rescheduleTimer()
-        Task { await refreshNow() }
+        if state != .ok {
+            Task { await refreshNow() }
+        }
     }
 
     /// Performs one refresh cycle: load credentials, fetch, retry once on 401.
     func refreshNow() async {
+        if let backoffUntil, now() < backoffUntil { return }
         if snapshot == nil { state = .loading }
         do {
             let creds = try credentials.loadCredentials()
@@ -78,6 +91,8 @@ final class UsageStore: ObservableObject {
             degrade(to: .network)
         } catch ProviderError.badResponse {
             degrade(to: .badResponse)
+        } catch ProviderError.rateLimited(let retryAfter) {
+            applyRateLimitBackoff(retryAfter: retryAfter)
         } catch CredentialError.notFound, CredentialError.malformed {
             state = .error(preferences.credentialMode == .manual ? .noManualToken : .claudeCodeNotFound)
         } catch CredentialError.accessDenied {
@@ -95,7 +110,17 @@ final class UsageStore: ObservableObject {
         if visible { visiblePanels.insert(source) } else { visiblePanels.remove(source) }
         guard panelVisible != wasVisible else { return }
         rescheduleTimer()
-        if panelVisible { Task { await refreshNow() } }
+        // Refresh on open only when the data is stale-ish, so opening and
+        // closing the panel repeatedly does not spam the endpoint.
+        if panelVisible, shouldRefreshOnOpen() {
+            Task { await refreshNow() }
+        }
+    }
+
+    /// True when on-open data is stale enough to justify a fetch.
+    private func shouldRefreshOnOpen() -> Bool {
+        guard let snapshot else { return true }
+        return now().timeIntervalSince(snapshot.fetchedAt) > 30
     }
 
     /// Re-applies the poll interval after a preference change.
@@ -118,7 +143,19 @@ final class UsageStore: ObservableObject {
         snapshot = fresh
         cache.save(fresh)
         lastSuccess = now()
+        backoffUntil = nil
+        consecutiveRateLimits = 0
         state = .ok
+    }
+
+    /// Pauses polling after a 429: honors `Retry-After`, else backs off
+    /// exponentially (2m, 5m, 15m). The cached snapshot stays shown as stale.
+    private func applyRateLimitBackoff(retryAfter: TimeInterval?) {
+        consecutiveRateLimits += 1
+        let steps: [TimeInterval] = [120, 300, 900]
+        let fallback = steps[min(consecutiveRateLimits - 1, steps.count - 1)]
+        backoffUntil = now().addingTimeInterval(retryAfter ?? fallback)
+        degrade(to: .badResponse)
     }
 
     /// A soft failure: keep showing the cached snapshot if we have one.
