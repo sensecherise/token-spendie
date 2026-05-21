@@ -49,6 +49,32 @@ struct PreferencesView: View {
                 .onChange(of: preferences.refreshInterval) { _ in onIntervalChanged() }
             }
 
+            VStack(alignment: .leading, spacing: 8) {
+                Text("APPEARANCE").font(.system(size: 10, weight: .heavy)).foregroundStyle(.secondary)
+                HStack(spacing: 8) {
+                    ForEach(Theme.allCases) { theme in
+                        Button { preferences.theme = theme } label: {
+                            VStack(spacing: 4) {
+                                HStack(spacing: 2) {
+                                    swatch(theme.color(for: .calm))
+                                    swatch(theme.color(for: .warn))
+                                    swatch(theme.color(for: .hot))
+                                }
+                                Text(theme.displayName).font(.system(size: 9))
+                            }
+                            .padding(6)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .fill(preferences.theme == theme
+                                          ? Color.accentColor.opacity(0.25)
+                                          : Color.clear)
+                            )
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
             Toggle("Launch at login", isOn: $preferences.launchAtLogin)
                 .onChange(of: preferences.launchAtLogin) { newValue in
                     if !LoginItem.setEnabled(newValue) {
@@ -64,6 +90,10 @@ struct PreferencesView: View {
         .padding(20)
         .frame(width: 300)
         .onAppear { preferences.launchAtLogin = LoginItem.isEnabled }
+    }
+
+    private func swatch(_ color: Color) -> some View {
+        RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 14, height: 14)
     }
 
     private enum Surface { case menuBar, floating }
