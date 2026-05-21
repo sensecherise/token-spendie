@@ -1,6 +1,21 @@
 import Foundation
 import Combine
 
+/// Which credential source the widget uses.
+enum CredentialMode: String, CaseIterable, Identifiable {
+    case auto
+    case manual
+
+    var id: String { rawValue }
+
+    var label: String {
+        switch self {
+        case .auto:   return "Claude Code Keychain"
+        case .manual: return "Manual token"
+        }
+    }
+}
+
 /// How often the widget polls when no panel is open.
 enum RefreshInterval: Int, CaseIterable, Identifiable {
     case s30 = 30
@@ -27,12 +42,16 @@ final class Preferences: ObservableObject {
     @Published var showFloatingPanel: Bool { didSet { defaults.set(showFloatingPanel, forKey: Keys.showFloatingPanel) } }
     @Published var refreshInterval: RefreshInterval { didSet { defaults.set(refreshInterval.rawValue, forKey: Keys.refreshInterval) } }
     @Published var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) } }
+    @Published var theme: Theme { didSet { defaults.set(theme.rawValue, forKey: Keys.theme) } }
+    @Published var credentialMode: CredentialMode { didSet { defaults.set(credentialMode.rawValue, forKey: Keys.credentialMode) } }
 
     private enum Keys {
         static let showMenuBar = "showMenuBar"
         static let showFloatingPanel = "showFloatingPanel"
         static let refreshInterval = "refreshInterval"
         static let launchAtLogin = "launchAtLogin"
+        static let theme = "theme"
+        static let credentialMode = "credentialMode"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -42,5 +61,9 @@ final class Preferences: ObservableObject {
         let storedInterval = defaults.object(forKey: Keys.refreshInterval) as? Int ?? RefreshInterval.s60.rawValue
         self.refreshInterval = RefreshInterval(rawValue: storedInterval) ?? .s60
         self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
+        let storedTheme = defaults.string(forKey: Keys.theme)
+        self.theme = storedTheme.flatMap(Theme.init(rawValue:)) ?? .default
+        let storedMode = defaults.string(forKey: Keys.credentialMode)
+        self.credentialMode = storedMode.flatMap(CredentialMode.init(rawValue:)) ?? .auto
     }
 }

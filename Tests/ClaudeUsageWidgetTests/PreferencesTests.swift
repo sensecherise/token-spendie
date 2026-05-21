@@ -32,4 +32,34 @@ final class PreferencesTests: XCTestCase {
         XCTAssertEqual(RefreshInterval.s60.seconds, 60)
         XCTAssertEqual(RefreshInterval.s120.seconds, 120)
     }
+
+    @MainActor
+    func testThemeDefaultsToDefault() {
+        let prefs = Preferences(defaults: freshDefaults())
+        XCTAssertEqual(prefs.theme, .default)
+    }
+
+    @MainActor
+    func testThemePersists() {
+        let defaults = freshDefaults()
+        let first = Preferences(defaults: defaults)
+        first.theme = .ocean
+        let second = Preferences(defaults: defaults)
+        XCTAssertEqual(second.theme, .ocean)
+    }
+
+    @MainActor
+    func testCredentialModeDefaultsToAuto() {
+        let prefs = Preferences(defaults: freshDefaults())
+        XCTAssertEqual(prefs.credentialMode, .auto)
+    }
+
+    @MainActor
+    func testCredentialModePersists() {
+        let defaults = freshDefaults()
+        let first = Preferences(defaults: defaults)
+        first.credentialMode = .manual
+        let second = Preferences(defaults: defaults)
+        XCTAssertEqual(second.credentialMode, .manual)
+    }
 }
