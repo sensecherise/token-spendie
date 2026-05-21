@@ -29,8 +29,8 @@ struct PreferencesView: View {
     let manualTokenStore: ManualTokenStore
     @State private var draftToken: String = ""
     @State private var tokenSaved: Bool = false
-    @State private var verifying: Bool = false
-    @State private var verifyStatus: String = ""
+    @State private var verifyState: TokenVerifyState = .idle
+    @State private var verifyTask: Task<Void, Never>?
     var onDisplayChanged: () -> Void
     var onIntervalChanged: () -> Void
 
@@ -86,30 +86,13 @@ struct PreferencesView: View {
                     ForEach(CredentialMode.allCases) { Text($0.label).tag($0) }
                 }
                 if preferences.credentialMode == .manual {
-                    HStack(spacing: 5) {
-                        Image(systemName: tokenSaved ? "checkmark.circle.fill" : "exclamationmark.circle")
-                            .foregroundStyle(tokenSaved ? Color.green : Color.secondary)
-                        Text(tokenSaved ? "Token saved" : "No token saved")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
-                    Text("Run `claude setup-token` in Terminal, then paste the token below.")
+                    Text("Run `claude setup-token` in Terminal, then paste the token below — it verifies automatically.")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
-                    SecureField(tokenSaved ? "Paste a new token to replace" : "Paste token",
-                                text: $draftToken)
-                    HStack {
-                        Button(verifying ? "Verifying…" : "Save & verify") { verifyAndSave() }
-                            .disabled(verifying
-                                || draftToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-                        if tokenSaved {
-                            Button("Clear") {
-                                manualTokenStore.clear()
-                                tokenSaved = false
-                                verifyStatus = ""
-                            }
-                        }
-                    }
-                    if !verifyStatus.isEmpty {
-                        Text(verifyStatus).font(.system(size: 10)).foregroundStyle(.secondary)
+                    SecureField("Paste token", text: $draftToken)
+                        .onChange(of: draftToken) { _ in scheduleVerify() }
+                    verifyIndicator
+                    if tokenSaved {
+                        Button("Clear") { clearToken() }
                     }
                 }
             }
@@ -138,31 +121,66 @@ struct PreferencesView: View {
         RoundedRectangle(cornerRadius: 3).fill(color).frame(width: 14, height: 14)
     }
 
-    /// Verifies the pasted token against the usage endpoint, then saves it.
-    /// A token the server rejects is not saved; a token that can't be reached
-    /// (network failure) is saved but flagged as unverified.
-    private func verifyAndSave() {
+    /// Inline state for the paste-and-verify flow.
+    private enum TokenVerifyState { case idle, verifying, verified, rejected, failed }
+
+    /// The inline spinner / result indicator under the token field.
+    @ViewBuilder private var verifyIndicator: some View {
+        switch verifyState {
+        case .idle:
+            EmptyView()
+        case .verifying:
+            HStack(spacing: 6) {
+                ProgressView().controlSize(.small)
+                Text("Verifying…").font(.system(size: 10)).foregroundStyle(.secondary)
+            }
+        case .verified:
+            Label("Verified — token saved", systemImage: "checkmark.circle.fill")
+                .font(.system(size: 10)).foregroundStyle(.green)
+        case .rejected:
+            Label("The server rejected this token", systemImage: "xmark.circle.fill")
+                .font(.system(size: 10)).foregroundStyle(.red)
+        case .failed:
+            Label("Couldn't verify — check your connection", systemImage: "exclamationmark.triangle.fill")
+                .font(.system(size: 10)).foregroundStyle(.orange)
+        }
+    }
+
+    /// Debounced: when the token field changes, verify it against the usage
+    /// endpoint and, on success, save it. Cancels any in-flight verification.
+    private func scheduleVerify() {
+        verifyTask?.cancel()
         let token = draftToken.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !token.isEmpty else { return }
-        verifying = true
-        verifyStatus = ""
-        Task { @MainActor in
+        guard !token.isEmpty else { verifyState = .idle; return }
+        verifyState = .verifying
+        verifyTask = Task { @MainActor in
+            try? await Task.sleep(nanoseconds: 400_000_000)
+            if Task.isCancelled { return }
             do {
                 _ = try await EndpointUsageProvider().fetchUsage(accessToken: token)
+                if Task.isCancelled { return }
                 try manualTokenStore.save(token: token)
-                draftToken = ""
                 tokenSaved = true
-                verifyStatus = "✓ Token verified and saved."
+                verifyState = .verified
             } catch ProviderError.unauthorized {
-                verifyStatus = "✗ The server rejected this token — not saved."
+                if Task.isCancelled { return }
+                verifyState = .rejected
             } catch {
+                if Task.isCancelled { return }
                 try? manualTokenStore.save(token: token)
-                draftToken = ""
                 tokenSaved = manualTokenStore.hasToken
-                verifyStatus = "Saved, but couldn't verify (network?)."
+                verifyState = .failed
             }
-            verifying = false
         }
+    }
+
+    /// Clears the stored token and the field.
+    private func clearToken() {
+        verifyTask?.cancel()
+        manualTokenStore.clear()
+        draftToken = ""
+        tokenSaved = false
+        verifyState = .idle
     }
 
     private enum Surface { case menuBar, floating }
