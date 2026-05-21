@@ -11,6 +11,8 @@ struct UsageBarRow: View {
 
     private var level: UsageLevel { UsageLevel.forPercent(window.percent) }
     private var tierColor: Color { theme.color(for: level) }
+    /// Stale data keeps its theme color, just faded — so the theme stays visible.
+    private var barColor: Color { tierColor.opacity(dimmed ? 0.45 : 1) }
     private var fraction: CGFloat { min(max(window.percent / 100, 0), 1) }
 
     var body: some View {
@@ -20,13 +22,13 @@ struct UsageBarRow: View {
                 Spacer()
                 Text("\(Int(window.percent.rounded()))%")
                     .font(.system(size: 12, weight: .bold))
-                    .foregroundStyle(dimmed ? Color.secondary : tierColor)
+                    .foregroundStyle(barColor)
             }
             GeometryReader { geo in
                 ZStack(alignment: .leading) {
                     Capsule().fill(Color.primary.opacity(0.12))
                     Capsule()
-                        .fill(dimmed ? Color.secondary : tierColor)
+                        .fill(barColor)
                         .frame(width: geo.size.width * fraction)
                 }
             }

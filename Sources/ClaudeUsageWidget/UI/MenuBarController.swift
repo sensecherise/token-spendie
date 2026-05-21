@@ -71,9 +71,9 @@ final class MenuBarController: NSObject {
         default:
             let percent = store.snapshot?.session.percent ?? 0
             let stale = store.state == .stale
-            let color = stale
-                ? NSColor.secondaryLabelColor
-                : NSColor(preferences.theme.color(for: UsageLevel.forPercent(percent)))
+            let themed = NSColor(preferences.theme.color(for: UsageLevel.forPercent(percent)))
+            // Stale keeps the theme hue, just faded.
+            let color = stale ? themed.withAlphaComponent(0.5) : themed
             button.image = Self.ringImage(percent: percent, color: color)
             button.title = " \(Int(percent.rounded()))%"
         }
