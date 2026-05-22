@@ -66,6 +66,35 @@ enum FetchingEllipsis {
     }
 }
 
+/// The resolved status shown in the popover header, left of the refresh button.
+enum RefreshStatus: Equatable {
+    /// No snapshot yet and not fetching — the header shows nothing.
+    case idle
+    /// A refresh is running — the header shows "fetching" + an animated ellipsis.
+    case fetching
+    /// A ready-to-display string: "updated 5m ago" / "offline — …" / "rate limited — …".
+    case text(String)
+}
+
+/// Resolves the header status from store state. Pure, so it is unit-tested
+/// directly; the view passes live store values and `Date()`.
+enum RefreshStatusResolver {
+    static func resolve(isFetching: Bool,
+                        snapshotFetchedAt: Date?,
+                        rateLimitedUntil: Date?,
+                        isStale: Bool,
+                        now: Date) -> RefreshStatus {
+        if isFetching { return .fetching }
+        guard let fetchedAt = snapshotFetchedAt else { return .idle }
+        if let until = rateLimitedUntil {
+            let mins = max(1, Int((until.timeIntervalSince(now) / 60).rounded(.up)))
+            return .text("rate limited — retry in \(mins)m")
+        }
+        let ago = Formatting.updatedAgo(fetchedAt, now: now)
+        return .text(isStale ? "offline — \(ago)" : ago)
+    }
+}
+
 /// The header refresh control: spins while a refresh runs — held to at least one
 /// full turn so a fast fetch is still visible — is disabled while spinning, and
 /// shows a subtle rounded background on hover.
