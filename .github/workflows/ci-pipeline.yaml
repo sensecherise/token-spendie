@@ -1,0 +1,40 @@
+name: CI Pipeline - Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+jobs:
+  build:
+    runs-on: macos-15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Select Xcode
+        run: sudo xcode-select -s /Applications/Xcode_16.app
+
+      - name: Build app bundle
+        run: bash build.sh
+
+      - name: Create tar.gz
+        run: |
+          cd build
+          tar -czf TokenSpendie.tar.gz TokenSpendie.app
+
+      - name: Compute checksums
+        run: |
+          shasum -a 256 build/TokenSpendie.zip    | tee build/TokenSpendie.zip.sha256
+          shasum -a 256 build/TokenSpendie.tar.gz | tee build/TokenSpendie.tar.gz.sha256
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/TokenSpendie.zip
+            build/TokenSpendie.zip.sha256
+            build/TokenSpendie.tar.gz
+            build/TokenSpendie.tar.gz.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
