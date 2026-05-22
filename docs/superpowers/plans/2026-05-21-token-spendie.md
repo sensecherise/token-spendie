@@ -1,4 +1,4 @@
-# Claude Usage Widget Implementation Plan
+# Token Spendie Implementation Plan
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
@@ -26,14 +26,14 @@ These were extracted from the installed Claude Code binary and confirmed live by
 ```
 claude-widget/
 ├── Package.swift
-├── build.sh                                  # compiles + assembles ClaudeUsage.app + zip
+├── build.sh                                  # compiles + assembles TokenSpendie.app + zip
 ├── README.md                                 # install/share instructions
 ├── Resources/
 │   └── Info.plist                            # bundle metadata, LSUIElement
 ├── Tools/
 │   ├── probe.swift                           # Task 1: live endpoint/keychain verification
 │   └── makeicon.swift                        # draws Resources/AppIcon-1024.png
-├── Sources/ClaudeUsageWidget/
+├── Sources/TokenSpendie/
 │   ├── main.swift                            # NSApplication entry point
 │   ├── AppDelegate.swift                     # wires everything together
 │   ├── Model/
@@ -55,7 +55,7 @@ claude-widget/
 │       ├── PreferencesView.swift             # settings UI + launch-at-login
 │       ├── MenuBarController.swift           # NSStatusItem + popover
 │       └── FloatingPanelController.swift     # always-on-top NSPanel
-└── Tests/ClaudeUsageWidgetTests/
+└── Tests/TokenSpendieTests/
     ├── UsageModelsTests.swift
     ├── OAuthCredentialsTests.swift
     ├── KeychainReaderTests.swift
@@ -132,7 +132,7 @@ var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/u
 request.httpMethod = "GET"
 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 request.setValue("application/json", forHTTPHeaderField: "Accept")
-request.setValue("ClaudeUsageWidget/probe", forHTTPHeaderField: "User-Agent")
+request.setValue("TokenSpendie/probe", forHTTPHeaderField: "User-Agent")
 
 let semaphore = DispatchSemaphore(value: 0)
 URLSession.shared.dataTask(with: request) { data, response, error in
@@ -180,9 +180,9 @@ Creates the Swift package so `swift build` and `swift test` succeed with an empt
 
 **Files:**
 - Create: `Package.swift`
-- Create: `Sources/ClaudeUsageWidget/main.swift`
-- Create: `Sources/ClaudeUsageWidget/AppDelegate.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/UsageModelsTests.swift`
+- Create: `Sources/TokenSpendie/main.swift`
+- Create: `Sources/TokenSpendie/AppDelegate.swift`
+- Create: `Tests/TokenSpendieTests/UsageModelsTests.swift`
 
 - [ ] **Step 1: Write `Package.swift`**
 
@@ -191,14 +191,14 @@ Creates the Swift package so `swift build` and `swift test` succeed with an empt
 import PackageDescription
 
 let package = Package(
-    name: "ClaudeUsageWidget",
+    name: "TokenSpendie",
     platforms: [.macOS(.v13)],
     targets: [
-        .executableTarget(name: "ClaudeUsageWidget", path: "Sources/ClaudeUsageWidget"),
+        .executableTarget(name: "TokenSpendie", path: "Sources/TokenSpendie"),
         .testTarget(
-            name: "ClaudeUsageWidgetTests",
-            dependencies: ["ClaudeUsageWidget"],
-            path: "Tests/ClaudeUsageWidgetTests"
+            name: "TokenSpendieTests",
+            dependencies: ["TokenSpendie"],
+            path: "Tests/TokenSpendieTests"
         ),
     ]
 )
@@ -251,7 +251,7 @@ Expected: `Test Suite 'All tests' passed`.
 
 ```bash
 git add Package.swift Sources Tests
-git commit -m "Scaffold Swift package for Claude Usage Widget"
+git commit -m "Scaffold Swift package for Token Spendie"
 ```
 
 ---
@@ -261,8 +261,8 @@ git commit -m "Scaffold Swift package for Claude Usage Widget"
 Defines the data types shared across every layer.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Model/UsageModels.swift`
-- Modify: `Tests/ClaudeUsageWidgetTests/UsageModelsTests.swift`
+- Create: `Sources/TokenSpendie/Model/UsageModels.swift`
+- Modify: `Tests/TokenSpendieTests/UsageModelsTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
@@ -270,7 +270,7 @@ Replace the contents of `UsageModelsTests.swift`:
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class UsageModelsTests: XCTestCase {
     func testSnapshotCodableRoundTrip() throws {
@@ -357,7 +357,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Model Tests/ClaudeUsageWidgetTests/UsageModelsTests.swift
+git add Sources/TokenSpendie/Model Tests/TokenSpendieTests/UsageModelsTests.swift
 git commit -m "Add usage data models"
 ```
 
@@ -368,14 +368,14 @@ git commit -m "Add usage data models"
 Models the Keychain credentials and parses the `claudeAiOauth` JSON blob. The parser is separate from Keychain access so it is fully unit-testable.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Data/OAuthCredentials.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/OAuthCredentialsTests.swift`
+- Create: `Sources/TokenSpendie/Data/OAuthCredentials.swift`
+- Create: `Tests/TokenSpendieTests/OAuthCredentialsTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class OAuthCredentialsTests: XCTestCase {
     func testParsesSecondsExpiry() throws {
@@ -481,7 +481,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Data/OAuthCredentials.swift Tests/ClaudeUsageWidgetTests/OAuthCredentialsTests.swift
+git add Sources/TokenSpendie/Data/OAuthCredentials.swift Tests/TokenSpendieTests/OAuthCredentialsTests.swift
 git commit -m "Add OAuth credentials model and parser"
 ```
 
@@ -492,18 +492,18 @@ git commit -m "Add OAuth credentials model and parser"
 The real `CredentialStore` over the macOS Keychain. The not-found path is unit-testable by querying a service name that cannot exist.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Data/KeychainReader.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/KeychainReaderTests.swift`
+- Create: `Sources/TokenSpendie/Data/KeychainReader.swift`
+- Create: `Tests/TokenSpendieTests/KeychainReaderTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class KeychainReaderTests: XCTestCase {
     func testMissingItemThrowsNotFound() {
-        let reader = KeychainReader(service: "ClaudeUsageWidget-NoSuchItem-\(UUID().uuidString)")
+        let reader = KeychainReader(service: "TokenSpendie-NoSuchItem-\(UUID().uuidString)")
         XCTAssertThrowsError(try reader.loadCredentials()) { error in
             XCTAssertEqual(error as? CredentialError, .notFound)
         }
@@ -563,7 +563,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Data/KeychainReader.swift Tests/ClaudeUsageWidgetTests/KeychainReaderTests.swift
+git add Sources/TokenSpendie/Data/KeychainReader.swift Tests/TokenSpendieTests/KeychainReaderTests.swift
 git commit -m "Add KeychainReader credential store"
 ```
 
@@ -574,8 +574,8 @@ git commit -m "Add KeychainReader credential store"
 Decodes the `/api/oauth/usage` JSON response into a `UsageSnapshot`. Uses `JSONSerialization` for leniency toward missing/unknown keys.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Data/UsageDecoder.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/UsageDecoderTests.swift`
+- Create: `Sources/TokenSpendie/Data/UsageDecoder.swift`
+- Create: `Tests/TokenSpendieTests/UsageDecoderTests.swift`
 
 > Confirmed by Task 1's probe: each window is `{utilization, resets_at}`; `utilization` is a percentage (0–100); `resets_at` is ISO 8601 with microsecond precision (e.g. `2026-05-21T10:20:00.431249+00:00`); windows that do not apply are sent as JSON `null`.
 
@@ -583,7 +583,7 @@ Decodes the `/api/oauth/usage` JSON response into a `UsageSnapshot`. Uses `JSONS
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class UsageDecoderTests: XCTestCase {
     let fetchedAt = Date(timeIntervalSince1970: 1_700_000_000)
@@ -720,7 +720,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Data/UsageDecoder.swift Tests/ClaudeUsageWidgetTests/UsageDecoderTests.swift
+git add Sources/TokenSpendie/Data/UsageDecoder.swift Tests/TokenSpendieTests/UsageDecoderTests.swift
 git commit -m "Add usage response decoder"
 ```
 
@@ -733,9 +733,9 @@ The `UsageProvider` protocol and its endpoint implementation. HTTP is injected a
 > **Plan change (from Task 1):** the plan originally included a second `HeaderUsageProvider` reading `anthropic-ratelimit-unified-*` response headers as a fallback. Task 1's probe proved those headers are absent from `/api/oauth/usage`, so that concrete fallback is dropped. The `UsageProvider` protocol still provides the swappable seam the spec asked for — a future fallback can be dropped in without touching callers.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Data/UsageProvider.swift`
-- Create: `Sources/ClaudeUsageWidget/Data/EndpointUsageProvider.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/UsageProviderTests.swift`
+- Create: `Sources/TokenSpendie/Data/UsageProvider.swift`
+- Create: `Sources/TokenSpendie/Data/EndpointUsageProvider.swift`
+- Create: `Tests/TokenSpendieTests/UsageProviderTests.swift`
 
 - [ ] **Step 1: Write `UsageProvider.swift` (protocol + transport)**
 
@@ -788,7 +788,7 @@ struct EndpointUsageProvider: UsageProvider {
         request.httpMethod = "GET"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("ClaudeUsageWidget/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("TokenSpendie/1.0", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await transport(request)
         switch response.statusCode {
@@ -807,7 +807,7 @@ struct EndpointUsageProvider: UsageProvider {
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class UsageProviderTests: XCTestCase {
     private func http(_ status: Int) -> HTTPURLResponse {
@@ -869,7 +869,7 @@ Expected: PASS (the implementations from Steps 1–2 are already in place).
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Data/UsageProvider.swift Sources/ClaudeUsageWidget/Data/EndpointUsageProvider.swift Tests/ClaudeUsageWidgetTests/UsageProviderTests.swift
+git add Sources/TokenSpendie/Data/UsageProvider.swift Sources/TokenSpendie/Data/EndpointUsageProvider.swift Tests/TokenSpendieTests/UsageProviderTests.swift
 git commit -m "Add endpoint usage provider"
 ```
 
@@ -880,14 +880,14 @@ git commit -m "Add endpoint usage provider"
 Persists the last snapshot to disk so the widget shows last-known values immediately on relaunch.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Store/SnapshotCache.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/SnapshotCacheTests.swift`
+- Create: `Sources/TokenSpendie/Store/SnapshotCache.swift`
+- Create: `Tests/TokenSpendieTests/SnapshotCacheTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class SnapshotCacheTests: XCTestCase {
     private func tempURL() -> URL {
@@ -938,10 +938,10 @@ import Foundation
 struct SnapshotCache {
     let fileURL: URL
 
-    /// Default location: ~/Library/Application Support/ClaudeUsage/last-snapshot.json
+    /// Default location: ~/Library/Application Support/TokenSpendie/last-snapshot.json
     static func defaultURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ClaudeUsage", isDirectory: true)
+            .appendingPathComponent("TokenSpendie", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base.appendingPathComponent("last-snapshot.json")
     }
@@ -966,7 +966,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Store/SnapshotCache.swift Tests/ClaudeUsageWidgetTests/SnapshotCacheTests.swift
+git add Sources/TokenSpendie/Store/SnapshotCache.swift Tests/TokenSpendieTests/SnapshotCacheTests.swift
 git commit -m "Add on-disk snapshot cache"
 ```
 
@@ -977,14 +977,14 @@ git commit -m "Add on-disk snapshot cache"
 UserDefaults-backed settings: which surfaces are shown, refresh interval, launch-at-login.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Store/Preferences.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/PreferencesTests.swift`
+- Create: `Sources/TokenSpendie/Store/Preferences.swift`
+- Create: `Tests/TokenSpendieTests/PreferencesTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class PreferencesTests: XCTestCase {
     private func freshDefaults() -> UserDefaults {
@@ -1084,7 +1084,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Store/Preferences.swift Tests/ClaudeUsageWidgetTests/PreferencesTests.swift
+git add Sources/TokenSpendie/Store/Preferences.swift Tests/TokenSpendieTests/PreferencesTests.swift
 git commit -m "Add UserDefaults-backed preferences"
 ```
 
@@ -1095,14 +1095,14 @@ git commit -m "Add UserDefaults-backed preferences"
 Pure presentation helpers: usage level (color tier) and human-readable time strings.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/UI/Formatting.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/FormattingTests.swift`
+- Create: `Sources/TokenSpendie/UI/Formatting.swift`
+- Create: `Tests/TokenSpendieTests/FormattingTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class FormattingTests: XCTestCase {
     func testLevelTiers() {
@@ -1205,7 +1205,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/Formatting.swift Tests/ClaudeUsageWidgetTests/FormattingTests.swift
+git add Sources/TokenSpendie/UI/Formatting.swift Tests/TokenSpendieTests/FormattingTests.swift
 git commit -m "Add usage level and time formatting helpers"
 ```
 
@@ -1216,14 +1216,14 @@ git commit -m "Add usage level and time formatting helpers"
 The orchestrator: loads the cached snapshot, polls on a timer, runs the 401 re-read retry, publishes `snapshot` and `state`, and tracks staleness.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Store/UsageStore.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift`
+- Create: `Sources/TokenSpendie/Store/UsageStore.swift`
+- Create: `Tests/TokenSpendieTests/UsageStoreTests.swift`
 
 - [ ] **Step 1: Write the failing test**
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 @MainActor
 final class UsageStoreTests: XCTestCase {
@@ -1469,7 +1469,7 @@ final class UsageStore: ObservableObject {
                 Task { @MainActor in await self?.refreshNow() }
             }
         }
-        pathMonitor.start(queue: DispatchQueue(label: "ClaudeUsage.network"))
+        pathMonitor.start(queue: DispatchQueue(label: "TokenSpendie.network"))
     }
 }
 ```
@@ -1487,7 +1487,7 @@ Expected: all suites pass.
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Store/UsageStore.swift Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift
+git add Sources/TokenSpendie/Store/UsageStore.swift Tests/TokenSpendieTests/UsageStoreTests.swift
 git commit -m "Add UsageStore polling and orchestration"
 ```
 
@@ -1498,7 +1498,7 @@ git commit -m "Add UsageStore polling and orchestration"
 The SwiftUI ring used in the menu bar, plus the compact menu bar label (ring + percentage / status glyph). No unit tests — verified by build and later runtime QA.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/UI/RingView.swift`
+- Create: `Sources/TokenSpendie/UI/RingView.swift`
 
 - [ ] **Step 1: Write `RingView.swift`**
 
@@ -1564,7 +1564,7 @@ Expected: `Build complete!`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/RingView.swift
+git add Sources/TokenSpendie/UI/RingView.swift
 git commit -m "Add ring view and compact menu bar label"
 ```
 
@@ -1575,7 +1575,7 @@ git commit -m "Add ring view and compact menu bar label"
 The shared stacked-bar detail view used by the popover and the floating panel.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift`
+- Create: `Sources/TokenSpendie/UI/DetailPanelView.swift`
 
 - [ ] **Step 1: Write `DetailPanelView.swift`**
 
@@ -1637,7 +1637,7 @@ struct DetailPanelView: View {
 
     private var header: some View {
         HStack {
-            Text("CLAUDE USAGE")
+            Text("TOKEN SPENDIE")
                 .font(.system(size: 10, weight: .heavy)).kerning(0.5)
             Spacer()
             Button(action: onRefresh) {
@@ -1727,7 +1727,7 @@ Expected: `Build complete!`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/DetailPanelView.swift
+git add Sources/TokenSpendie/UI/DetailPanelView.swift
 git commit -m "Add detail panel view"
 ```
 
@@ -1738,7 +1738,7 @@ git commit -m "Add detail panel view"
 The settings UI and `SMAppService` launch-at-login integration.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/UI/PreferencesView.swift`
+- Create: `Sources/TokenSpendie/UI/PreferencesView.swift`
 
 - [ ] **Step 1: Write `PreferencesView.swift`**
 
@@ -1776,7 +1776,7 @@ struct PreferencesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Claude Usage Widget").font(.system(size: 14, weight: .bold))
+            Text("Token Spendie").font(.system(size: 14, weight: .bold))
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("DISPLAY").font(.system(size: 10, weight: .heavy)).foregroundStyle(.secondary)
@@ -1834,7 +1834,7 @@ Expected: `Build complete!`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/PreferencesView.swift
+git add Sources/TokenSpendie/UI/PreferencesView.swift
 git commit -m "Add preferences view and launch-at-login"
 ```
 
@@ -1845,7 +1845,7 @@ git commit -m "Add preferences view and launch-at-login"
 Owns the `NSStatusItem` (hosting `MenuBarLabel`) and a click-toggled `NSPopover` showing `DetailPanelView`.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/UI/MenuBarController.swift`
+- Create: `Sources/TokenSpendie/UI/MenuBarController.swift`
 
 - [ ] **Step 1: Write `MenuBarController.swift`**
 
@@ -1924,7 +1924,7 @@ Expected: `Build complete!`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/MenuBarController.swift
+git add Sources/TokenSpendie/UI/MenuBarController.swift
 git commit -m "Add menu bar controller"
 ```
 
@@ -1935,7 +1935,7 @@ git commit -m "Add menu bar controller"
 Owns an always-on-top, draggable `NSPanel` hosting `DetailPanelView`.
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift`
+- Create: `Sources/TokenSpendie/UI/FloatingPanelController.swift`
 
 - [ ] **Step 1: Write `FloatingPanelController.swift`**
 
@@ -2002,7 +2002,7 @@ Expected: `Build complete!`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift
+git add Sources/TokenSpendie/UI/FloatingPanelController.swift
 git commit -m "Add floating panel controller"
 ```
 
@@ -2013,7 +2013,7 @@ git commit -m "Add floating panel controller"
 Connects every component, applies preferences, and provides the Settings window. After this the app runs end to end.
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/AppDelegate.swift`
+- Modify: `Sources/TokenSpendie/AppDelegate.swift`
 
 - [ ] **Step 1: Replace `AppDelegate.swift`**
 
@@ -2075,7 +2075,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 320),
             styleMask: [.titled, .closable], backing: .buffered, defer: false
         )
-        window.title = "Claude Usage Widget"
+        window.title = "Token Spendie"
         window.contentViewController = NSHostingController(rootView: view)
         window.isReleasedWhenClosed = false
         window.center()
@@ -2090,7 +2090,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
 Run: `swift build`
 Expected: `Build complete!`
-Run: `swift run ClaudeUsageWidget`
+Run: `swift run TokenSpendie`
 Expected: a ring + percentage appears in the menu bar within a few seconds. A Keychain prompt may appear — click **Allow**.
 
 - [ ] **Step 3: Manual verification**
@@ -2109,7 +2109,7 @@ Stop the run with Ctrl+C if still attached.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/AppDelegate.swift
+git add Sources/TokenSpendie/AppDelegate.swift
 git commit -m "Wire app components together end to end"
 ```
 
@@ -2117,7 +2117,7 @@ git commit -m "Wire app components together end to end"
 
 ## Task 18: Icon, Info.plist, build.sh, README + final QA
 
-Packages the app into a shareable `ClaudeUsage.app` and documents installation.
+Packages the app into a shareable `TokenSpendie.app` and documents installation.
 
 **Files:**
 - Create: `Tools/makeicon.swift`
@@ -2175,13 +2175,13 @@ print("wrote Resources/AppIcon-1024.png")
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-    <key>CFBundleName</key>            <string>ClaudeUsage</string>
-    <key>CFBundleDisplayName</key>     <string>Claude Usage Widget</string>
-    <key>CFBundleIdentifier</key>      <string>com.cherise.ClaudeUsage</string>
+    <key>CFBundleName</key>            <string>TokenSpendie</string>
+    <key>CFBundleDisplayName</key>     <string>Token Spendie</string>
+    <key>CFBundleIdentifier</key>      <string>com.cherise.TokenSpendie</string>
     <key>CFBundleVersion</key>         <string>1</string>
     <key>CFBundleShortVersionString</key> <string>1.0.0</string>
     <key>CFBundlePackageType</key>     <string>APPL</string>
-    <key>CFBundleExecutable</key>      <string>ClaudeUsageWidget</string>
+    <key>CFBundleExecutable</key>      <string>TokenSpendie</string>
     <key>CFBundleIconFile</key>        <string>AppIcon</string>
     <key>LSMinimumSystemVersion</key>  <string>13.0</string>
     <key>LSUIElement</key>             <true/>
@@ -2194,12 +2194,12 @@ print("wrote Resources/AppIcon-1024.png")
 
 ```bash
 #!/usr/bin/env bash
-# Builds ClaudeUsage.app and a shareable zip.
+# Builds TokenSpendie.app and a shareable zip.
 set -euo pipefail
 cd "$(dirname "$0")"
 
-APP="build/ClaudeUsage.app"
-BIN_NAME="ClaudeUsageWidget"
+APP="build/TokenSpendie.app"
+BIN_NAME="TokenSpendie"
 
 echo "==> Compiling (release)"
 swift build -c release
@@ -2222,15 +2222,15 @@ cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
 echo "==> Zipping for sharing"
-( cd build && rm -f ClaudeUsage.zip && ditto -c -k --keepParent ClaudeUsage.app ClaudeUsage.zip )
+( cd build && rm -f TokenSpendie.zip && ditto -c -k --keepParent TokenSpendie.app TokenSpendie.zip )
 
-echo "==> Done: $APP  and  build/ClaudeUsage.zip"
+echo "==> Done: $APP  and  build/TokenSpendie.zip"
 ```
 
 - [ ] **Step 4: Write `README.md`**
 
 ```markdown
-# Claude Usage Widget
+# Token Spendie
 
 A macOS menu bar widget that shows your Claude Code usage — the 5-hour session
 window and weekly caps — in real time.
@@ -2241,11 +2241,11 @@ Requires the Swift toolchain (Xcode Command Line Tools). No Xcode needed.
 
     ./build.sh
 
-This produces `build/ClaudeUsage.app` and `build/ClaudeUsage.zip`.
+This produces `build/TokenSpendie.app` and `build/TokenSpendie.zip`.
 
 ## Install
 
-1. Unzip `ClaudeUsage.zip` and move `ClaudeUsage.app` to `/Applications`.
+1. Unzip `TokenSpendie.zip` and move `TokenSpendie.app` to `/Applications`.
 2. **First launch:** right-click the app → **Open**, then confirm. This is
    required once because the app is not notarized.
 3. When macOS asks for Keychain access, choose **Allow** — the widget reads your
@@ -2266,18 +2266,18 @@ This produces `build/ClaudeUsage.app` and `build/ClaudeUsage.zip`.
 
 ## Sharing with friends
 
-Send them `ClaudeUsage.zip`. They follow the same Install steps. Each machine
+Send them `TokenSpendie.zip`. They follow the same Install steps. Each machine
 uses its own Claude Code login automatically — there is nothing to configure.
 ```
 
 - [ ] **Step 5: Make `build.sh` executable and run it**
 
 Run: `chmod +x build.sh && ./build.sh`
-Expected: ends with `Done: build/ClaudeUsage.app  and  build/ClaudeUsage.zip`.
+Expected: ends with `Done: build/TokenSpendie.app  and  build/TokenSpendie.zip`.
 
 - [ ] **Step 6: Final QA — launch the packaged app**
 
-Run: `open build/ClaudeUsage.app`
+Run: `open build/TokenSpendie.app`
 Confirm:
 1. No Dock icon appears (it is an `LSUIElement` accessory app).
 2. The menu bar ring appears and shows real usage.

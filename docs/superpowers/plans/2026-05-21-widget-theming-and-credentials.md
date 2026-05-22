@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Add preset color themes and a manual credential-entry option to the existing Claude Usage Widget.
+**Goal:** Add preset color themes and a manual credential-entry option to the existing Token Spendie.
 
 **Architecture:** A `Theme` enum maps usage tiers to colors; `Preferences` stores the chosen theme and credential mode; the menu bar ring and detail-panel bars read the theme. A new `ManualTokenStore` holds a user-pasted token in the app's own Keychain item, and a `CredentialRouter` picks between it and the existing `KeychainReader` by mode.
 
@@ -14,16 +14,16 @@
 
 Existing project on branch `main`, working app. Relevant files:
 
-- `Sources/ClaudeUsageWidget/Model/UsageModels.swift` — `UsageWindow`, `ModelWeekly`, `UsageSnapshot`, `UsageError`, `ProviderError`, `LoadState`.
-- `Sources/ClaudeUsageWidget/Data/OAuthCredentials.swift` — `OAuthCredentials`, `CredentialError` (`notFound`/`accessDenied`/`malformed`), `OAuthCredentialsParser`, `CredentialStore` protocol.
-- `Sources/ClaudeUsageWidget/Data/KeychainReader.swift` — `KeychainReader: CredentialStore`.
-- `Sources/ClaudeUsageWidget/Store/Preferences.swift` — `Preferences` (`@MainActor`, `ObservableObject`), `RefreshInterval`.
-- `Sources/ClaudeUsageWidget/Store/UsageStore.swift` — `UsageStore`; `refreshNow()` maps errors to `LoadState`.
-- `Sources/ClaudeUsageWidget/UI/Formatting.swift` — `UsageLevel` (`calm`/`warn`/`hot`, `forPercent`, `color`), `Formatting`.
-- `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift` — `UsageBarRow`, `DetailPanelView`.
-- `Sources/ClaudeUsageWidget/UI/MenuBarController.swift` — status item, `ringImage`, dropdown panel.
-- `Sources/ClaudeUsageWidget/UI/PreferencesView.swift` — `LoginItem`, `PreferencesView`.
-- `Sources/ClaudeUsageWidget/AppDelegate.swift` — wires everything.
+- `Sources/TokenSpendie/Model/UsageModels.swift` — `UsageWindow`, `ModelWeekly`, `UsageSnapshot`, `UsageError`, `ProviderError`, `LoadState`.
+- `Sources/TokenSpendie/Data/OAuthCredentials.swift` — `OAuthCredentials`, `CredentialError` (`notFound`/`accessDenied`/`malformed`), `OAuthCredentialsParser`, `CredentialStore` protocol.
+- `Sources/TokenSpendie/Data/KeychainReader.swift` — `KeychainReader: CredentialStore`.
+- `Sources/TokenSpendie/Store/Preferences.swift` — `Preferences` (`@MainActor`, `ObservableObject`), `RefreshInterval`.
+- `Sources/TokenSpendie/Store/UsageStore.swift` — `UsageStore`; `refreshNow()` maps errors to `LoadState`.
+- `Sources/TokenSpendie/UI/Formatting.swift` — `UsageLevel` (`calm`/`warn`/`hot`, `forPercent`, `color`), `Formatting`.
+- `Sources/TokenSpendie/UI/DetailPanelView.swift` — `UsageBarRow`, `DetailPanelView`.
+- `Sources/TokenSpendie/UI/MenuBarController.swift` — status item, `ringImage`, dropdown panel.
+- `Sources/TokenSpendie/UI/PreferencesView.swift` — `LoginItem`, `PreferencesView`.
+- `Sources/TokenSpendie/AppDelegate.swift` — wires everything.
 
 The full suite is **34 tests**; `swift test` must stay green after every task.
 
@@ -32,7 +32,7 @@ If `swift` is not found, prefix commands with `export PATH="$(dirname "$(xcrun -
 ## File Structure
 
 ```
-Sources/ClaudeUsageWidget/
+Sources/TokenSpendie/
 ├── UI/Theme.swift                  # NEW — Theme enum (presets → tier colors)
 ├── Data/ManualTokenStore.swift     # NEW — pasted token in the app's own Keychain item
 ├── Data/CredentialRouter.swift     # NEW — picks KeychainReader vs ManualTokenStore by mode
@@ -45,7 +45,7 @@ Sources/ClaudeUsageWidget/
 ├── UI/PreferencesView.swift        # MODIFIED — APPEARANCE + CREDENTIAL sections
 └── AppDelegate.swift               # MODIFIED — build router; pass preferences to MenuBarController
 Tools/token-probe.swift             # NEW — one-off: verify a setup-token works
-Tests/ClaudeUsageWidgetTests/
+Tests/TokenSpendieTests/
 ├── ThemeTests.swift                # NEW
 ├── ManualTokenStoreTests.swift     # NEW
 ├── CredentialRouterTests.swift     # NEW
@@ -60,14 +60,14 @@ Tests/ClaudeUsageWidgetTests/
 ## Task 1: Theme model
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/UI/Theme.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/ThemeTests.swift`
+- Create: `Sources/TokenSpendie/UI/Theme.swift`
+- Create: `Tests/TokenSpendieTests/ThemeTests.swift`
 
-- [ ] **Step 1: Write the failing test** — create `Tests/ClaudeUsageWidgetTests/ThemeTests.swift`:
+- [ ] **Step 1: Write the failing test** — create `Tests/TokenSpendieTests/ThemeTests.swift`:
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class ThemeTests: XCTestCase {
     func testFourThemes() {
@@ -105,7 +105,7 @@ final class ThemeTests: XCTestCase {
 Run: `swift test --filter ThemeTests`
 Expected: FAIL — `cannot find 'Theme' in scope`.
 
-- [ ] **Step 3: Write `Theme.swift`** — create `Sources/ClaudeUsageWidget/UI/Theme.swift`:
+- [ ] **Step 3: Write `Theme.swift`** — create `Sources/TokenSpendie/UI/Theme.swift`:
 
 ```swift
 import SwiftUI
@@ -169,7 +169,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/Theme.swift Tests/ClaudeUsageWidgetTests/ThemeTests.swift
+git add Sources/TokenSpendie/UI/Theme.swift Tests/TokenSpendieTests/ThemeTests.swift
 git commit -m "Add Theme model with four preset palettes"
 ```
 
@@ -178,10 +178,10 @@ git commit -m "Add Theme model with four preset palettes"
 ## Task 2: Preferences — theme & credential mode
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/Store/Preferences.swift`
-- Modify: `Tests/ClaudeUsageWidgetTests/PreferencesTests.swift`
+- Modify: `Sources/TokenSpendie/Store/Preferences.swift`
+- Modify: `Tests/TokenSpendieTests/PreferencesTests.swift`
 
-- [ ] **Step 1: Write the failing test** — append these methods inside `final class PreferencesTests` in `Tests/ClaudeUsageWidgetTests/PreferencesTests.swift` (before the closing brace):
+- [ ] **Step 1: Write the failing test** — append these methods inside `final class PreferencesTests` in `Tests/TokenSpendieTests/PreferencesTests.swift` (before the closing brace):
 
 ```swift
     @MainActor
@@ -222,7 +222,7 @@ Expected: FAIL — `value of type 'Preferences' has no member 'theme'`.
 
 - [ ] **Step 3: Add the `CredentialMode` enum and the two properties.**
 
-In `Sources/ClaudeUsageWidget/Store/Preferences.swift`, add this enum at the top of the file, just after the existing `import` lines:
+In `Sources/TokenSpendie/Store/Preferences.swift`, add this enum at the top of the file, just after the existing `import` lines:
 
 ```swift
 /// Which credential source the widget uses.
@@ -272,7 +272,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Store/Preferences.swift Tests/ClaudeUsageWidgetTests/PreferencesTests.swift
+git add Sources/TokenSpendie/Store/Preferences.swift Tests/TokenSpendieTests/PreferencesTests.swift
 git commit -m "Add theme and credentialMode to Preferences"
 ```
 
@@ -283,10 +283,10 @@ git commit -m "Add theme and credentialMode to Preferences"
 Removes `UsageLevel.color` and updates every consumer to use `theme.color(for:)`. UI task — verified by `swift build` and the full test suite.
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/UI/Formatting.swift`
-- Modify: `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift`
-- Modify: `Sources/ClaudeUsageWidget/UI/MenuBarController.swift`
-- Modify: `Sources/ClaudeUsageWidget/AppDelegate.swift`
+- Modify: `Sources/TokenSpendie/UI/Formatting.swift`
+- Modify: `Sources/TokenSpendie/UI/DetailPanelView.swift`
+- Modify: `Sources/TokenSpendie/UI/MenuBarController.swift`
+- Modify: `Sources/TokenSpendie/AppDelegate.swift`
 
 - [ ] **Step 1: `Formatting.swift` — make `UsageLevel` `Hashable`, remove `color`.**
 
@@ -390,7 +390,7 @@ Change the `menuBar = MenuBarController(...)` line to:
                                    onOpenSettings: { [weak self] in self?.showSettings() })
 ```
 
-`FloatingPanelController` also builds a `DetailPanelView`. In `Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift`, the `DetailPanelView(...)` call must pass `preferences:`. `FloatingPanelController` does not currently hold `preferences` — add it: a `private let preferences: Preferences` property, add `preferences` to its `init` signature, and in `AppDelegate` update the `floatingPanel = FloatingPanelController(...)` call to pass `preferences: preferences`. Then in `FloatingPanelController.show()`, the `DetailPanelView(...)` gets `preferences: preferences`.
+`FloatingPanelController` also builds a `DetailPanelView`. In `Sources/TokenSpendie/UI/FloatingPanelController.swift`, the `DetailPanelView(...)` call must pass `preferences:`. `FloatingPanelController` does not currently hold `preferences` — add it: a `private let preferences: Preferences` property, add `preferences` to its `init` signature, and in `AppDelegate` update the `floatingPanel = FloatingPanelController(...)` call to pass `preferences: preferences`. Then in `FloatingPanelController.show()`, the `DetailPanelView(...)` gets `preferences: preferences`.
 
 - [ ] **Step 5: Build and test**
 
@@ -402,7 +402,7 @@ Expected: all tests pass (34).
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget
+git add Sources/TokenSpendie
 git commit -m "Color the ring and bars from the selected theme"
 ```
 
@@ -413,7 +413,7 @@ git commit -m "Color the ring and bars from the selected theme"
 UI task — verified by `swift build`.
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/UI/PreferencesView.swift`
+- Modify: `Sources/TokenSpendie/UI/PreferencesView.swift`
 
 - [ ] **Step 1: Add a theme-picker section.**
 
@@ -465,7 +465,7 @@ Expected: `Build complete!`
 - [ ] **Step 3: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/PreferencesView.swift
+git add Sources/TokenSpendie/UI/PreferencesView.swift
 git commit -m "Add theme picker to Preferences"
 ```
 
@@ -477,8 +477,8 @@ git commit -m "Add theme picker to Preferences"
 
 **Files:**
 - Create: `Tools/token-probe.swift`
-- Create: `Sources/ClaudeUsageWidget/Data/ManualTokenStore.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/ManualTokenStoreTests.swift`
+- Create: `Sources/TokenSpendie/Data/ManualTokenStore.swift`
+- Create: `Tests/TokenSpendieTests/ManualTokenStoreTests.swift`
 
 - [ ] **Step 1: Write the verification probe** — create `Tools/token-probe.swift`:
 
@@ -496,7 +496,7 @@ var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/u
 request.httpMethod = "GET"
 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 request.setValue("application/json", forHTTPHeaderField: "Accept")
-request.setValue("ClaudeUsageWidget/token-probe", forHTTPHeaderField: "User-Agent")
+request.setValue("TokenSpendie/token-probe", forHTTPHeaderField: "User-Agent")
 
 let semaphore = DispatchSemaphore(value: 0)
 URLSession.shared.dataTask(with: request) { data, response, error in
@@ -523,15 +523,15 @@ Expected: `HTTP 200` and a JSON body with `five_hour` / `seven_day`.
 
 If the status is `200`, the manual-token path is sound — continue. If it is `401`/`403`, STOP and report NEEDS_CONTEXT: a `claude setup-token` token is not accepted by this endpoint and the manual-credentials feature needs rethinking before proceeding.
 
-- [ ] **Step 3: Write the failing test** — create `Tests/ClaudeUsageWidgetTests/ManualTokenStoreTests.swift`:
+- [ ] **Step 3: Write the failing test** — create `Tests/TokenSpendieTests/ManualTokenStoreTests.swift`:
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class ManualTokenStoreTests: XCTestCase {
     private func testStore() -> ManualTokenStore {
-        ManualTokenStore(service: "ClaudeUsageWidget-Test-\(UUID().uuidString)")
+        ManualTokenStore(service: "TokenSpendie-Test-\(UUID().uuidString)")
     }
 
     func testSaveThenLoadRoundTrips() throws {
@@ -576,7 +576,7 @@ final class ManualTokenStoreTests: XCTestCase {
 Run: `swift test --filter ManualTokenStoreTests`
 Expected: FAIL — `cannot find 'ManualTokenStore' in scope`.
 
-- [ ] **Step 5: Write `ManualTokenStore.swift`** — create `Sources/ClaudeUsageWidget/Data/ManualTokenStore.swift`:
+- [ ] **Step 5: Write `ManualTokenStore.swift`** — create `Sources/TokenSpendie/Data/ManualTokenStore.swift`:
 
 ```swift
 import Foundation
@@ -587,7 +587,7 @@ import Security
 final class ManualTokenStore: CredentialStore {
     let service: String
 
-    init(service: String = "com.cherise.ClaudeUsage.token") {
+    init(service: String = "com.cherise.TokenSpendie.token") {
         self.service = service
     }
 
@@ -648,7 +648,7 @@ Expected: PASS.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add Tools/token-probe.swift Sources/ClaudeUsageWidget/Data/ManualTokenStore.swift Tests/ClaudeUsageWidgetTests/ManualTokenStoreTests.swift
+git add Tools/token-probe.swift Sources/TokenSpendie/Data/ManualTokenStore.swift Tests/TokenSpendieTests/ManualTokenStoreTests.swift
 git commit -m "Add ManualTokenStore for pasted credentials"
 ```
 
@@ -657,12 +657,12 @@ git commit -m "Add ManualTokenStore for pasted credentials"
 ## Task 6: `noManualToken` error state
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/Model/UsageModels.swift`
-- Modify: `Sources/ClaudeUsageWidget/Store/UsageStore.swift`
-- Modify: `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift`
-- Modify: `Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift`
+- Modify: `Sources/TokenSpendie/Model/UsageModels.swift`
+- Modify: `Sources/TokenSpendie/Store/UsageStore.swift`
+- Modify: `Sources/TokenSpendie/UI/DetailPanelView.swift`
+- Modify: `Tests/TokenSpendieTests/UsageStoreTests.swift`
 
-- [ ] **Step 1: Write the failing test** — append inside `final class UsageStoreTests` in `Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift` (before the closing brace):
+- [ ] **Step 1: Write the failing test** — append inside `final class UsageStoreTests` in `Tests/TokenSpendieTests/UsageStoreTests.swift` (before the closing brace):
 
 ```swift
     func testManualModeMissingTokenSurfacesNoManualToken() async {
@@ -688,13 +688,13 @@ git commit -m "Add ManualTokenStore for pasted credentials"
 Run: `swift test --filter UsageStoreTests`
 Expected: FAIL — `type 'UsageError' has no member 'noManualToken'`.
 
-- [ ] **Step 3: Add the error case.** In `Sources/ClaudeUsageWidget/Model/UsageModels.swift`, add a case to `enum UsageError`:
+- [ ] **Step 3: Add the error case.** In `Sources/TokenSpendie/Model/UsageModels.swift`, add a case to `enum UsageError`:
 
 ```swift
     case noManualToken          // manual mode selected but no token saved
 ```
 
-- [ ] **Step 4: Make the `notFound` mapping mode-aware.** In `Sources/ClaudeUsageWidget/Store/UsageStore.swift`, in `refreshNow()`, replace the existing `catch CredentialError.notFound, CredentialError.malformed { ... }` block with:
+- [ ] **Step 4: Make the `notFound` mapping mode-aware.** In `Sources/TokenSpendie/Store/UsageStore.swift`, in `refreshNow()`, replace the existing `catch CredentialError.notFound, CredentialError.malformed { ... }` block with:
 
 ```swift
         } catch CredentialError.notFound, CredentialError.malformed {
@@ -706,7 +706,7 @@ Expected: FAIL — `type 'UsageError' has no member 'noManualToken'`.
 
 (The `accessDenied` line is unchanged — it already follows; keep it exactly once.)
 
-- [ ] **Step 5: Handle the new case in `DetailPanelView`.** In `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift`, in `messageView(for:)`, add a case to the `switch kind`:
+- [ ] **Step 5: Handle the new case in `DetailPanelView`.** In `Sources/TokenSpendie/UI/DetailPanelView.swift`, in `messageView(for:)`, add a case to the `switch kind`:
 
 ```swift
             case .noManualToken:
@@ -723,7 +723,7 @@ Expected: `Build complete!` (confirms the `DetailPanelView` switch is exhaustive
 - [ ] **Step 7: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift
+git add Sources/TokenSpendie Tests/TokenSpendieTests/UsageStoreTests.swift
 git commit -m "Add noManualToken error state"
 ```
 
@@ -732,14 +732,14 @@ git commit -m "Add noManualToken error state"
 ## Task 7: CredentialRouter
 
 **Files:**
-- Create: `Sources/ClaudeUsageWidget/Data/CredentialRouter.swift`
-- Create: `Tests/ClaudeUsageWidgetTests/CredentialRouterTests.swift`
+- Create: `Sources/TokenSpendie/Data/CredentialRouter.swift`
+- Create: `Tests/TokenSpendieTests/CredentialRouterTests.swift`
 
-- [ ] **Step 1: Write the failing test** — create `Tests/ClaudeUsageWidgetTests/CredentialRouterTests.swift`:
+- [ ] **Step 1: Write the failing test** — create `Tests/TokenSpendieTests/CredentialRouterTests.swift`:
 
 ```swift
 import XCTest
-@testable import ClaudeUsageWidget
+@testable import TokenSpendie
 
 final class CredentialRouterTests: XCTestCase {
     private final class StubStore: CredentialStore {
@@ -787,7 +787,7 @@ final class CredentialRouterTests: XCTestCase {
 Run: `swift test --filter CredentialRouterTests`
 Expected: FAIL — `cannot find 'CredentialRouter' in scope`.
 
-- [ ] **Step 3: Write `CredentialRouter.swift`** — create `Sources/ClaudeUsageWidget/Data/CredentialRouter.swift`:
+- [ ] **Step 3: Write `CredentialRouter.swift`** — create `Sources/TokenSpendie/Data/CredentialRouter.swift`:
 
 ```swift
 import Foundation
@@ -823,7 +823,7 @@ Expected: PASS.
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Data/CredentialRouter.swift Tests/ClaudeUsageWidgetTests/CredentialRouterTests.swift
+git add Sources/TokenSpendie/Data/CredentialRouter.swift Tests/TokenSpendieTests/CredentialRouterTests.swift
 git commit -m "Add CredentialRouter to switch credential sources"
 ```
 
@@ -834,7 +834,7 @@ git commit -m "Add CredentialRouter to switch credential sources"
 UI/integration task — verified by `swift build`, `swift test`, and a launch smoke test.
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/AppDelegate.swift`
+- Modify: `Sources/TokenSpendie/AppDelegate.swift`
 
 - [ ] **Step 1: Build and hold the router and manual store.**
 
@@ -895,18 +895,18 @@ Expected: all tests pass.
 - [ ] **Step 5: Smoke test**
 
 ```bash
-swift run ClaudeUsageWidget > /tmp/cuw-run.log 2>&1 &
+swift run TokenSpendie > /tmp/cuw-run.log 2>&1 &
 RUNPID=$!
 sleep 8
 kill -0 $RUNPID 2>/dev/null && echo "ALIVE" || { echo "DEAD"; cat /tmp/cuw-run.log; }
-kill $RUNPID 2>/dev/null; pkill -f ClaudeUsageWidget 2>/dev/null
+kill $RUNPID 2>/dev/null; pkill -f TokenSpendie 2>/dev/null
 ```
 Expected: `ALIVE`.
 
 - [ ] **Step 6: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/AppDelegate.swift
+git add Sources/TokenSpendie/AppDelegate.swift
 git commit -m "Wire CredentialRouter and manual token store into the app"
 ```
 
@@ -917,8 +917,8 @@ git commit -m "Wire CredentialRouter and manual token store into the app"
 UI task — verified by `swift build`.
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/UI/PreferencesView.swift`
-- Modify: `Sources/ClaudeUsageWidget/AppDelegate.swift`
+- Modify: `Sources/TokenSpendie/UI/PreferencesView.swift`
+- Modify: `Sources/TokenSpendie/AppDelegate.swift`
 
 - [ ] **Step 1: Give `PreferencesView` the manual store and a draft field.**
 
@@ -982,7 +982,7 @@ Expected: `Build complete!`
 - [ ] **Step 5: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/PreferencesView.swift Sources/ClaudeUsageWidget/AppDelegate.swift
+git add Sources/TokenSpendie/UI/PreferencesView.swift Sources/TokenSpendie/AppDelegate.swift
 git commit -m "Add credential source section to Preferences"
 ```
 
@@ -1002,12 +1002,12 @@ Expected: `Build complete!`
 - [ ] **Step 2: Package**
 
 Run: `./build.sh`
-Expected: ends with `Done: build/ClaudeUsage.app  and  build/ClaudeUsage.zip`.
+Expected: ends with `Done: build/TokenSpendie.app  and  build/TokenSpendie.zip`.
 
 - [ ] **Step 3: Manual QA**
 
 ```bash
-open build/ClaudeUsage.app
+open build/TokenSpendie.app
 ```
 Confirm:
 1. Menu bar ring shows in the Default theme.

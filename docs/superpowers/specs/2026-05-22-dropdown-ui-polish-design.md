@@ -123,12 +123,12 @@ set `isRefreshing`).
 
 | File | Change |
 |------|--------|
-| `Sources/ClaudeUsageWidget/UI/MenuBarController.swift` | Highlight status item on open/close; pass `onQuit`; route refresh to `manualRefresh()` |
-| `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift` | Actions section + status strip; new `MenuActionRow`; `onQuit` property; refresh icon hover + spin + disable |
-| `Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift` | Pass `onQuit`; route refresh to `manualRefresh()` |
-| `Sources/ClaudeUsageWidget/AppDelegate.swift` | Provide `onQuit` (`NSApp.terminate`) to both controllers |
-| `Sources/ClaudeUsageWidget/Store/UsageStore.swift` | `isRefreshing` published flag; `manualRefresh()` with 2 s gap |
-| `Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift` | Cover `manualRefresh()` gap + `isRefreshing` lifecycle |
+| `Sources/TokenSpendie/UI/MenuBarController.swift` | Highlight status item on open/close; pass `onQuit`; route refresh to `manualRefresh()` |
+| `Sources/TokenSpendie/UI/DetailPanelView.swift` | Actions section + status strip; new `MenuActionRow`; `onQuit` property; refresh icon hover + spin + disable |
+| `Sources/TokenSpendie/UI/FloatingPanelController.swift` | Pass `onQuit`; route refresh to `manualRefresh()` |
+| `Sources/TokenSpendie/AppDelegate.swift` | Provide `onQuit` (`NSApp.terminate`) to both controllers |
+| `Sources/TokenSpendie/Store/UsageStore.swift` | `isRefreshing` published flag; `manualRefresh()` with 2 s gap |
+| `Tests/TokenSpendieTests/UsageStoreTests.swift` | Cover `manualRefresh()` gap + `isRefreshing` lifecycle |
 
 ## Testing
 

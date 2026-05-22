@@ -16,24 +16,24 @@
 
 | File | Responsibility | Change |
 |------|----------------|--------|
-| `Sources/ClaudeUsageWidget/Store/UsageStore.swift` | Polling + published state | Add `isRefreshing` flag, `manualRefresh()` with 2 s throttle |
-| `Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift` | Store unit tests | Add `ProbeProvider` double + 4 tests |
-| `Sources/ClaudeUsageWidget/UI/MenuBarController.swift` | Status item + dropdown panel | Highlight status item on open/close; new `onQuit`; route refresh to `manualRefresh()` |
-| `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift` | The dropdown's SwiftUI content | Actions section + status strip; `RefreshButton` + `MenuActionRow`; `onQuit` property |
-| `Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift` | Optional floating panel | New `onQuit`; route refresh to `manualRefresh()` |
-| `Sources/ClaudeUsageWidget/AppDelegate.swift` | App wiring | Provide `onQuit` (`NSApp.terminate`) to both controllers |
+| `Sources/TokenSpendie/Store/UsageStore.swift` | Polling + published state | Add `isRefreshing` flag, `manualRefresh()` with 2 s throttle |
+| `Tests/TokenSpendieTests/UsageStoreTests.swift` | Store unit tests | Add `ProbeProvider` double + 4 tests |
+| `Sources/TokenSpendie/UI/MenuBarController.swift` | Status item + dropdown panel | Highlight status item on open/close; new `onQuit`; route refresh to `manualRefresh()` |
+| `Sources/TokenSpendie/UI/DetailPanelView.swift` | The dropdown's SwiftUI content | Actions section + status strip; `RefreshButton` + `MenuActionRow`; `onQuit` property |
+| `Sources/TokenSpendie/UI/FloatingPanelController.swift` | Optional floating panel | New `onQuit`; route refresh to `manualRefresh()` |
+| `Sources/TokenSpendie/AppDelegate.swift` | App wiring | Provide `onQuit` (`NSApp.terminate`) to both controllers |
 
 ---
 
 ## Task 1: `UsageStore` — `isRefreshing` flag + throttled `manualRefresh()`
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/Store/UsageStore.swift`
-- Test: `Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift`
+- Modify: `Sources/TokenSpendie/Store/UsageStore.swift`
+- Test: `Tests/TokenSpendieTests/UsageStoreTests.swift`
 
 - [ ] **Step 1: Add the `ProbeProvider` test double**
 
-In `Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift`, immediately after the
+In `Tests/TokenSpendieTests/UsageStoreTests.swift`, immediately after the
 `StubProvider` class closing brace (currently line 24), add:
 
 ```swift
@@ -112,7 +112,7 @@ Expected: FAIL — compile error, `value of type 'UsageStore' has no member 'isR
 
 - [ ] **Step 4: Add the `isRefreshing` published property**
 
-In `Sources/ClaudeUsageWidget/Store/UsageStore.swift`, replace:
+In `Sources/TokenSpendie/Store/UsageStore.swift`, replace:
 
 ```swift
     @Published private(set) var snapshot: UsageSnapshot?
@@ -205,7 +205,7 @@ Expected: PASS — all `UsageStoreTests` tests green, including the four new one
 - [ ] **Step 9: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/Store/UsageStore.swift Tests/ClaudeUsageWidgetTests/UsageStoreTests.swift
+git add Sources/TokenSpendie/Store/UsageStore.swift Tests/TokenSpendieTests/UsageStoreTests.swift
 git commit -m "$(cat <<'EOF'
 Add isRefreshing flag and un-spammable manual refresh
 
@@ -223,7 +223,7 @@ EOF
 ## Task 2: Status item backdrop — highlight the icon while the dropdown is open
 
 **Files:**
-- Modify: `Sources/ClaudeUsageWidget/UI/MenuBarController.swift`
+- Modify: `Sources/TokenSpendie/UI/MenuBarController.swift`
 
 `NSStatusBarButton.highlight(_:)` draws the standard rounded macOS selection
 backdrop behind the icon. This task is visual — verified by build + manual QA, no
@@ -231,7 +231,7 @@ unit test.
 
 - [ ] **Step 1: Highlight the status item when the panel opens**
 
-In `Sources/ClaudeUsageWidget/UI/MenuBarController.swift`, inside `openPanel()`,
+In `Sources/TokenSpendie/UI/MenuBarController.swift`, inside `openPanel()`,
 replace:
 
 ```swift
@@ -288,7 +288,7 @@ Expected: `Build complete!` with no errors.
 - [ ] **Step 4: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/MenuBarController.swift
+git add Sources/TokenSpendie/UI/MenuBarController.swift
 git commit -m "$(cat <<'EOF'
 Highlight the status item while the dropdown is open
 
@@ -305,10 +305,10 @@ EOF
 ## Task 3: Dropdown layout — actions section, Quit, hover states, refresh animation
 
 **Files:**
-- Modify (full rewrite): `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift`
-- Modify: `Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift`
-- Modify: `Sources/ClaudeUsageWidget/UI/MenuBarController.swift`
-- Modify: `Sources/ClaudeUsageWidget/AppDelegate.swift`
+- Modify (full rewrite): `Sources/TokenSpendie/UI/DetailPanelView.swift`
+- Modify: `Sources/TokenSpendie/UI/FloatingPanelController.swift`
+- Modify: `Sources/TokenSpendie/UI/MenuBarController.swift`
+- Modify: `Sources/TokenSpendie/AppDelegate.swift`
 
 This is one atomic change: `DetailPanelView` gains an `onQuit` parameter, so the
 project does not compile until every caller is updated. All edits land in one
@@ -316,7 +316,7 @@ commit.
 
 - [ ] **Step 1: Rewrite `DetailPanelView.swift`**
 
-Replace the entire contents of `Sources/ClaudeUsageWidget/UI/DetailPanelView.swift`
+Replace the entire contents of `Sources/TokenSpendie/UI/DetailPanelView.swift`
 with:
 
 ```swift
@@ -457,7 +457,7 @@ struct DetailPanelView: View {
 
     private var header: some View {
         HStack {
-            Text("CLAUDE USAGE")
+            Text("TOKEN SPENDIE")
                 .font(.system(size: 10, weight: .heavy)).kerning(0.5)
             Spacer()
             RefreshButton(store: store, onRefresh: onRefresh)
@@ -545,7 +545,7 @@ struct DetailPanelView: View {
 
 - [ ] **Step 2: Update `FloatingPanelController.swift`**
 
-In `Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift`, replace:
+In `Sources/TokenSpendie/UI/FloatingPanelController.swift`, replace:
 
 ```swift
     private let store: UsageStore
@@ -603,7 +603,7 @@ with:
 
 - [ ] **Step 3: Update `MenuBarController.swift`**
 
-In `Sources/ClaudeUsageWidget/UI/MenuBarController.swift`, replace:
+In `Sources/TokenSpendie/UI/MenuBarController.swift`, replace:
 
 ```swift
     private let store: UsageStore
@@ -680,7 +680,7 @@ with:
 
 - [ ] **Step 4: Update `AppDelegate.swift`**
 
-In `Sources/ClaudeUsageWidget/AppDelegate.swift`, replace:
+In `Sources/TokenSpendie/AppDelegate.swift`, replace:
 
 ```swift
         menuBar = MenuBarController(store: store, preferences: preferences,
@@ -713,7 +713,7 @@ Expected: PASS — all tests green; nothing regressed.
 - [ ] **Step 7: Commit**
 
 ```bash
-git add Sources/ClaudeUsageWidget/UI/DetailPanelView.swift Sources/ClaudeUsageWidget/UI/FloatingPanelController.swift Sources/ClaudeUsageWidget/UI/MenuBarController.swift Sources/ClaudeUsageWidget/AppDelegate.swift
+git add Sources/TokenSpendie/UI/DetailPanelView.swift Sources/TokenSpendie/UI/FloatingPanelController.swift Sources/TokenSpendie/UI/MenuBarController.swift Sources/TokenSpendie/AppDelegate.swift
 git commit -m "$(cat <<'EOF'
 Restructure dropdown: actions section, Quit, hover, refresh spin
 

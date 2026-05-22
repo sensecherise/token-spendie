@@ -1,11 +1,11 @@
-# Claude Usage Widget — Theming & Manual Credentials — Design
+# Token Spendie — Theming & Manual Credentials — Design
 
 **Date:** 2026-05-21
 **Status:** Approved (pending spec review)
 
 ## Overview
 
-Two independent features added to the existing Claude Usage Widget:
+Two independent features added to the existing Token Spendie:
 
 - **Feature A — Color theming:** the user picks from preset color themes that
   recolor the menu bar ring and detail-panel bars.
@@ -86,7 +86,7 @@ This feature adds a second credential source behind the existing
   Keychain item. This is **Auto** mode. It prompts once per app version
   (the user clicks "Always Allow").
 - `ManualTokenStore` (new) — returns a token the user pasted, stored in the
-  app's **own** Keychain item, service `com.cherise.ClaudeUsage.token`. Because
+  app's **own** Keychain item, service `com.cherise.TokenSpendie.token`. Because
   the app created that item, reading it never triggers a prompt.
 
 `Preferences` gains `credentialMode: CredentialMode` (`.auto` / `.manual`),

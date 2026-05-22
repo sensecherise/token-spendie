@@ -1,4 +1,4 @@
-# Claude Usage Widget — Design
+# Token Spendie — Design
 
 **Date:** 2026-05-21
 **Status:** Approved (pending spec review)
@@ -80,7 +80,7 @@ is color-coded (see Color scale).
 
 **Detail panel** (shared by the click-popover and the floating panel):
 
-- Header: `CLAUDE USAGE` title + a refresh button.
+- Header: `TOKEN SPENDIE` title + a refresh button.
 - Three stacked metric rows — **Session**, **Weekly**, **Weekly · Opus** — each
   a labelled horizontal progress bar with its percentage and a reset line
   (e.g. "5-hour window · resets in 2h 47m", "all models · resets Mon, May 25").
@@ -153,7 +153,7 @@ Preferences are persisted in `UserDefaults`. At least one display surface
 - **Deployment target:** macOS 13 Ventura or later (required by
   `SMAppService`).
 - **Build:** `build.sh` runs `swift build -c release`, then assembles
-  `ClaudeUsage.app` — `Contents/MacOS/` (binary), `Contents/Info.plist`
+  `TokenSpendie.app` — `Contents/MacOS/` (binary), `Contents/Info.plist`
   (`LSUIElement = true`, bundle id, version), `Contents/Resources/AppIcon.icns`.
   A simple app icon is generated as part of the build.
 - **Launch at login:** `SMAppService.mainApp`.
