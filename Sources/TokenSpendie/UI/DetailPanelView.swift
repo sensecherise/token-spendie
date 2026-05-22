@@ -371,9 +371,8 @@ struct DetailPanelView: View {
         if store.providers.isEmpty {
             panelMessage(for: .claudeCodeNotFound).padding(13)
         } else {
-            ForEach(store.providers.indices, id: \.self) { index in
-                ProviderSection(provider: store.providers[index],
-                                theme: preferences.theme)
+            ForEach(Array(store.providers.enumerated()), id: \.element.id) { index, provider in
+                ProviderSection(provider: provider, theme: preferences.theme)
                     .padding(13)
                 if index < store.providers.count - 1 {
                     Divider()
