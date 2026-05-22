@@ -39,10 +39,10 @@ struct ClaudeProvider: UsageProvider {
     /// Pure `UsageSnapshot` → `ProviderSnapshot` mapping. The session window is
     /// the headline; `windows` is `[session, weekly, model-weeklies…]`.
     static func convert(_ usage: UsageSnapshot) -> ProviderSnapshot {
-        let session = LabeledWindow(label: "Session · 5h", detail: "5-hour window",
+        let session = LabeledWindow(label: "Session", detail: "5-hour window",
                                     resetStyle: .countdown, window: usage.session)
         var windows = [session]
-        windows.append(LabeledWindow(label: "Weekly · all", detail: "all models",
+        windows.append(LabeledWindow(label: "Weekly", detail: "all models",
                                      resetStyle: .date, window: usage.weekly))
         for model in usage.modelWeeklies {
             windows.append(LabeledWindow(label: "Weekly · \(model.model)",

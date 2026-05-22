@@ -71,6 +71,13 @@ final class UsageStore: ObservableObject {
                     id: provider.id, displayName: provider.displayName,
                     state: fresh ? .ok : .stale, snapshot: cached)
                 if fresh { lastSuccess[provider.id] = cached.fetchedAt }
+            } else {
+                // No cached snapshot yet — seed a loading row so a cold launch
+                // shows "Loading usage…" until the first fetch completes,
+                // matching the pre-refactor behavior.
+                usageByID[provider.id] = ProviderUsage(
+                    id: provider.id, displayName: provider.displayName,
+                    state: .loading, snapshot: nil)
             }
         }
         // Publish cached rows immediately so launch has no empty flash.

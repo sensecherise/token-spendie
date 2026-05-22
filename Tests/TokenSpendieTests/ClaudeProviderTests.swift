@@ -60,10 +60,10 @@ final class ClaudeProviderTests: XCTestCase {
     func testConvertMapsWindowsWithLabelsAndHeadline() {
         let snapshot = ClaudeProvider.convert(usageSnapshot())
         XCTAssertEqual(snapshot.id, .claude)
-        XCTAssertEqual(snapshot.headline.label, "Session · 5h")
+        XCTAssertEqual(snapshot.headline.label, "Session")
         XCTAssertEqual(snapshot.headline.window.percent, 47, accuracy: 0.001)
         XCTAssertEqual(snapshot.windows.map(\.label),
-                       ["Session · 5h", "Weekly · all", "Weekly · Opus"])
+                       ["Session", "Weekly", "Weekly · Opus"])
         XCTAssertEqual(snapshot.windows[0].resetStyle, .countdown)
         XCTAssertEqual(snapshot.windows[1].resetStyle, .date)
         XCTAssertEqual(snapshot.windows[1].detail, "all models")

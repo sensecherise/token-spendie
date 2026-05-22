@@ -68,6 +68,9 @@ final class MenuBarController: NSObject {
             return
         }
         switch provider.state {
+        case .error(.claudeCodeNotFound):
+            button.image = nil
+            button.title = "✳ –"
         case .error:
             button.image = nil
             button.title = "✳ !"
