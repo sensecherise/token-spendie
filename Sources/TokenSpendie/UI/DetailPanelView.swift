@@ -52,47 +52,159 @@ enum RefreshSpin {
     }
 }
 
-/// The header refresh control: spins while a refresh runs — held to at least one
-/// full turn so a fast fetch is still visible — is disabled while spinning, and
-/// shows a subtle rounded background on hover.
-private struct RefreshButton: View {
+/// Drives the "fetching…" ellipsis: a dot count that cycles 1 → 2 → 3 as the
+/// `TimelineView` ticks, so the text reads "fetching." → "fetching.." →
+/// "fetching..." while a refresh runs.
+enum FetchingEllipsis {
+    /// Seconds between dot-count changes — the `TimelineView` tick interval.
+    static let period: TimeInterval = 0.4
+
+    /// Dot count (1...3) for a given timeline tick.
+    static func dotCount(at date: Date) -> Int {
+        let ticks = Int(date.timeIntervalSinceReferenceDate / period)
+        return ticks % 3 + 1
+    }
+}
+
+/// The resolved status shown in the popover header, left of the refresh button.
+enum RefreshStatus: Equatable {
+    /// No snapshot yet and not fetching — the header shows nothing.
+    case idle
+    /// A refresh is running — the header shows "fetching" + an animated ellipsis.
+    case fetching
+    /// A ready-to-display string: "updated 5m ago" / "offline — …" / "rate limited — …".
+    case text(String)
+}
+
+/// Resolves the header status from store state. Pure, so it is unit-tested
+/// directly; the view passes live store values and `Date()`.
+enum RefreshStatusResolver {
+    static func resolve(isFetching: Bool,
+                        snapshotFetchedAt: Date?,
+                        rateLimitedUntil: Date?,
+                        isStale: Bool,
+                        now: Date) -> RefreshStatus {
+        if isFetching { return .fetching }
+        guard let fetchedAt = snapshotFetchedAt else { return .idle }
+        if let until = rateLimitedUntil {
+            let mins = max(1, Int((until.timeIntervalSince(now) / 60).rounded(.up)))
+            return .text("rate limited — retry in \(mins)m")
+        }
+        let ago = Formatting.updatedAgo(fetchedAt, now: now)
+        return .text(isStale ? "offline — \(ago)" : ago)
+    }
+}
+
+/// A headless circular arc — `arrow.clockwise` with the head removed — that
+/// spins continuously. Shown in place of the refresh glyph while a fetch runs.
+private struct SpinningArc: View {
+    @State private var angle: Double = 0
+
+    var body: some View {
+        Circle()
+            .trim(from: 0, to: 0.85)
+            .stroke(style: StrokeStyle(lineWidth: 1.6, lineCap: .round))
+            .frame(width: 11, height: 11)
+            .rotationEffect(.degrees(angle))
+            .onAppear {
+                withAnimation(.linear(duration: 1).repeatForever(autoreverses: false)) {
+                    angle = 360
+                }
+            }
+    }
+}
+
+/// The popover header's status + refresh control. Owns the spin state so the
+/// status text and the icon flip together: while spinning the text reads
+/// "fetching…" and the glyph cross-fades from `arrow.clockwise` to a headless
+/// spinning arc. The spin is held to at least one full turn via `RefreshSpin`
+/// so a fast fetch is still readable; the "fetching…" text honours the same
+/// minimum because both are driven by `spinning`.
+private struct RefreshIndicator: View {
     @ObservedObject var store: UsageStore
     var onRefresh: () -> Void
+
     @State private var hovering = false
-    /// Drives the spin. Set true when a refresh starts; cleared only after the
-    /// fetch finishes AND at least `RefreshSpin.minDuration` has been shown.
+    /// Drives the "fetching…" text and the icon morph. Set true when a refresh
+    /// starts; cleared only after the fetch finishes AND `RefreshSpin.minDuration`
+    /// has elapsed.
     @State private var spinning = false
     /// When the current spin began — used to compute the minimum hold.
     @State private var spinStart: Date?
 
     var body: some View {
-        Button(action: tapped) {
-            Image(systemName: "arrow.clockwise")
-                .font(.system(size: 11, weight: .semibold))
-                .rotationEffect(.degrees(spinning ? 360 : 0))
-                .animation(spinAnimation, value: spinning)
-                .frame(width: 20, height: 20)
-                .background(
-                    RoundedRectangle(cornerRadius: 6, style: .continuous)
-                        .fill(Color.primary.opacity(hovering ? 0.12 : 0))
-                )
+        HStack(spacing: 6) {
+            statusText
+            refreshButton
         }
-        .buttonStyle(.plain)
-        .disabled(spinning)
-        .onHover { hovering = $0 }
-        .animation(.easeOut(duration: 0.12), value: hovering)
         .onAppear { if store.isRefreshing { startSpin() } }
         .onChange(of: store.isRefreshing) { refreshing in
             if refreshing { startSpin() } else { stopSpinAfterMinimum() }
         }
     }
 
-    /// Continuous rotation while spinning; a quick settle to rest when it ends.
-    private var spinAnimation: Animation {
-        spinning
-            ? .linear(duration: 1).repeatForever(autoreverses: false)
-            : .linear(duration: 0.2)
+    // MARK: Status text
+
+    @ViewBuilder
+    private var statusText: some View {
+        switch RefreshStatusResolver.resolve(
+            isFetching: spinning,
+            snapshotFetchedAt: store.snapshot?.fetchedAt,
+            rateLimitedUntil: store.rateLimitedUntil,
+            isStale: store.state == .stale,
+            now: Date()
+        ) {
+        case .idle:
+            EmptyView()
+        case .fetching:
+            fetchingText
+        case .text(let value):
+            Text(value)
+                .font(.system(size: 9))
+                .foregroundStyle(.secondary)
+        }
     }
+
+    /// "fetching" followed by an ellipsis that cycles 1 → 2 → 3 dots. The dots
+    /// sit in a fixed-width slot so the row width does not jump as they change.
+    private var fetchingText: some View {
+        TimelineView(.periodic(from: .now, by: FetchingEllipsis.period)) { context in
+            HStack(spacing: 0) {
+                Text("fetching")
+                Text(String(repeating: ".", count: FetchingEllipsis.dotCount(at: context.date)))
+                    .frame(width: 12, alignment: .leading)
+            }
+            .font(.system(size: 9))
+            .foregroundStyle(.secondary)
+        }
+    }
+
+    // MARK: Refresh button
+
+    private var refreshButton: some View {
+        Button(action: tapped) {
+            ZStack {
+                Image(systemName: "arrow.clockwise")
+                    .font(.system(size: 11, weight: .semibold))
+                    .opacity(spinning ? 0 : 1)
+                if spinning {
+                    SpinningArc().transition(.opacity)
+                }
+            }
+            .frame(width: 20, height: 20)
+            .background(
+                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                    .fill(Color.primary.opacity(hovering ? 0.12 : 0))
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(spinning)
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.12), value: hovering)
+        .animation(.easeInOut(duration: 0.15), value: spinning)
+    }
+
+    // MARK: Spin state
 
     /// Handles a click: spins immediately to acknowledge it, then triggers the
     /// refresh. The spin is feedback for the *click*, so it runs even when the
@@ -168,8 +280,6 @@ struct DetailPanelView: View {
             content.padding(13)
             Divider()
             actions
-            Divider()
-            statusStrip
         }
         .frame(width: 260)
     }
@@ -179,7 +289,7 @@ struct DetailPanelView: View {
             Text("TOKEN SPENDIE")
                 .font(.system(size: 10, weight: .heavy)).kerning(0.5)
             Spacer()
-            RefreshButton(store: store, onRefresh: onRefresh)
+            RefreshIndicator(store: store, onRefresh: onRefresh)
         }
         .padding(.horizontal, 10).padding(.vertical, 6)
     }
@@ -243,22 +353,4 @@ struct DetailPanelView: View {
         .padding(.vertical, 4)
     }
 
-    private var statusStrip: some View {
-        Text(statusText)
-            .font(.system(size: 9))
-            .foregroundStyle(.secondary)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 13)
-            .padding(.vertical, 7)
-    }
-
-    private var statusText: String {
-        guard let snapshot = store.snapshot else { return " " }
-        let ago = Formatting.updatedAgo(snapshot.fetchedAt, now: Date())
-        if let until = store.rateLimitedUntil {
-            let mins = max(1, Int((until.timeIntervalSinceNow / 60).rounded(.up)))
-            return "rate limited — retry in \(mins)m"
-        }
-        return store.state == .stale ? "offline — \(ago)" : ago
-    }
 }

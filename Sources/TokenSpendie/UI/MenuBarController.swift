@@ -161,7 +161,6 @@ final class MenuBarController: NSObject {
         panel.makeKeyAndOrderFront(nil)
         self.panel = panel
         button.highlight(true)
-        store.setPanelVisible(true, source: .menuBar)
 
         // Dismiss when the user clicks anywhere outside the panel.
         clickMonitor = NSEvent.addGlobalMonitorForEvents(
@@ -180,6 +179,5 @@ final class MenuBarController: NSObject {
         panel?.orderOut(nil)
         guard panel != nil else { return }
         panel = nil
-        store.setPanelVisible(false, source: .menuBar)
     }
 }
