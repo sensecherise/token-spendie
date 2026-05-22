@@ -14,9 +14,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         preferences = Preferences()
         store = UsageStore(
-            provider: EndpointUsageProvider(),
-            credentials: KeychainReader(),
-            cache: SnapshotCache(fileURL: SnapshotCache.defaultURL()),
+            providers: [ClaudeProvider(), GeminiProvider()],
             preferences: preferences
         )
         menuBar = MenuBarController(store: store, preferences: preferences,

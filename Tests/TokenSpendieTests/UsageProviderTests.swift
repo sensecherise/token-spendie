@@ -51,7 +51,7 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(captured?.value(forHTTPHeaderField: "Accept"), "application/json")
     }
 
-    private func assertThrows(_ provider: UsageProvider, _ expected: ProviderError,
+    private func assertThrows(_ provider: ClaudeUsageEndpoint, _ expected: ProviderError,
                               accessToken: String = "tok",
                               file: StaticString = #filePath, line: UInt = #line) async {
         do {

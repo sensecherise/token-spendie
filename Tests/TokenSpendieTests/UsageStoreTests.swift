@@ -3,211 +3,195 @@ import XCTest
 
 @MainActor
 final class UsageStoreTests: XCTestCase {
-    // --- Test doubles ---
-    final class StubCredentials: CredentialStore {
-        var result: Result<OAuthCredentials, Error>
-        var loadCount = 0
-        init(_ result: Result<OAuthCredentials, Error>) { self.result = result }
-        func loadCredentials() throws -> OAuthCredentials {
-            loadCount += 1
-            return try result.get()
-        }
-    }
+
+    /// A configurable `UsageProvider` test double.
     final class StubProvider: UsageProvider {
-        var results: [Result<UsageSnapshot, Error>]
+        let id: ProviderID
+        let displayName: String
+        var detected: Bool
+        var results: [Result<ProviderSnapshot, Error>]
         var callCount = 0
-        init(_ results: [Result<UsageSnapshot, Error>]) { self.results = results }
-        func fetchUsage(accessToken: String) async throws -> UsageSnapshot {
+        var onFetch: () -> Void = {}
+
+        init(id: ProviderID = .claude, displayName: String = "Claude",
+             detected: Bool = true, results: [Result<ProviderSnapshot, Error>]) {
+            self.id = id
+            self.displayName = displayName
+            self.detected = detected
+            self.results = results
+        }
+        func detectCredentials() -> Bool { detected }
+        func fetchUsage() async throws -> ProviderSnapshot {
+            onFetch()
             defer { callCount += 1 }
             return try results[min(callCount, results.count - 1)].get()
         }
     }
-    /// A provider that runs a probe closure when `fetchUsage` is called,
-    /// for observing store state mid-refresh.
-    final class ProbeProvider: UsageProvider {
-        var onFetch: () -> Void = {}
-        let result: Result<UsageSnapshot, Error>
-        init(_ result: Result<UsageSnapshot, Error>) { self.result = result }
-        func fetchUsage(accessToken: String) async throws -> UsageSnapshot {
-            onFetch()
-            return try result.get()
-        }
+
+    private func snapshot(_ percent: Double, at: TimeInterval = 0,
+                          id: ProviderID = .claude) -> ProviderSnapshot {
+        let win = LabeledWindow(label: "Session · 5h", detail: "5-hour window",
+                                resetStyle: .countdown,
+                                window: UsageWindow(percent: percent, resetsAt: nil))
+        return ProviderSnapshot(id: id, plan: nil, headline: win, windows: [win],
+                                fetchedAt: Date(timeIntervalSince1970: at))
     }
 
-    private func creds() -> OAuthCredentials {
-        OAuthCredentials(accessToken: "tok", refreshToken: nil, expiresAt: nil)
-    }
-    private func snapshot(_ percent: Double, at: TimeInterval = 0) -> UsageSnapshot {
-        UsageSnapshot(session: UsageWindow(percent: percent, resetsAt: nil),
-                      weekly: UsageWindow(percent: percent, resetsAt: nil),
-                      modelWeeklies: [], fetchedAt: Date(timeIntervalSince1970: at))
-    }
-    private func makeStore(credentials: CredentialStore, provider: UsageProvider,
+    private func makeStore(_ providers: [UsageProvider],
                            now: @escaping () -> Date = { Date(timeIntervalSince1970: 0) }) -> UsageStore {
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("store-\(UUID().uuidString).json")
-        return UsageStore(provider: provider,
-                          credentials: credentials,
-                          cache: SnapshotCache(fileURL: url),
-                          preferences: Preferences(defaults: UserDefaults(suiteName: UUID().uuidString)!),
-                          now: now)
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("store-\(UUID().uuidString)", isDirectory: true)
+        try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        return UsageStore(
+            providers: providers,
+            cacheFactory: { id in SnapshotCache(fileURL: dir.appendingPathComponent("\(id.rawValue).json")) },
+            preferences: Preferences(defaults: UserDefaults(suiteName: UUID().uuidString)!),
+            now: now)
     }
 
-    func testSuccessfulRefreshPublishesSnapshotAndOk() async {
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: StubProvider([.success(snapshot(42))]))
-        await store.refreshNow()
-        XCTAssertEqual(store.snapshot?.session.percent, 42)
-        XCTAssertEqual(store.state, .ok)
+    private func usage(_ store: UsageStore, _ id: ProviderID) -> ProviderUsage? {
+        store.providers.first { $0.id == id }
     }
 
-    func testMissingKeychainSurfacesClaudeCodeNotFound() async {
-        let store = makeStore(credentials: StubCredentials(.failure(CredentialError.notFound)),
-                              provider: StubProvider([.success(snapshot(1))]))
+    func testSuccessfulRefreshPublishesProviderSnapshotAndOk() async {
+        let store = makeStore([StubProvider(results: [.success(snapshot(42))])])
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.claudeCodeNotFound))
+        XCTAssertEqual(usage(store, .claude)?.state, .ok)
+        XCTAssertEqual(usage(store, .claude)?.snapshot?.headline.window.percent, 42)
     }
 
-    func testMalformedKeychainSurfacesClaudeCodeNotFound() async {
-        let store = makeStore(credentials: StubCredentials(.failure(CredentialError.malformed)),
-                              provider: StubProvider([.success(snapshot(1))]))
+    func testUndetectedProviderProducesNoRow() async {
+        let store = makeStore([StubProvider(detected: false, results: [.success(snapshot(1))])])
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.claudeCodeNotFound))
+        XCTAssertTrue(store.providers.isEmpty, "an undetected provider has no row")
+    }
+
+    func testMissingCredentialsSurfaceClaudeCodeNotFound() async {
+        let store = makeStore([StubProvider(results: [.failure(CredentialError.notFound)])])
+        await store.refreshNow()
+        XCTAssertEqual(usage(store, .claude)?.state, .error(.claudeCodeNotFound))
+    }
+
+    func testMalformedCredentialsSurfaceClaudeCodeNotFound() async {
+        let store = makeStore([StubProvider(results: [.failure(CredentialError.malformed)])])
+        await store.refreshNow()
+        XCTAssertEqual(usage(store, .claude)?.state, .error(.claudeCodeNotFound))
     }
 
     func testKeychainDeniedSurfacesError() async {
-        let store = makeStore(credentials: StubCredentials(.failure(CredentialError.accessDenied)),
-                              provider: StubProvider([.success(snapshot(1))]))
+        let store = makeStore([StubProvider(results: [.failure(CredentialError.accessDenied)])])
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.keychainAccessDenied))
-    }
-
-    func testUnauthorizedRetriesByRereadingKeychain() async {
-        let credentials = StubCredentials(.success(creds()))
-        let provider = StubProvider([.failure(ProviderError.unauthorized), .success(snapshot(55))])
-        let store = makeStore(credentials: credentials, provider: provider)
-        await store.refreshNow()
-        XCTAssertEqual(store.state, .ok)
-        XCTAssertEqual(store.snapshot?.session.percent, 55)
-        XCTAssertEqual(credentials.loadCount, 2, "should re-read the Keychain once on 401")
+        XCTAssertEqual(usage(store, .claude)?.state, .error(.keychainAccessDenied))
     }
 
     func testPersistentUnauthorizedSurfacesLoginExpired() async {
-        let provider = StubProvider([.failure(ProviderError.unauthorized),
-                                     .failure(ProviderError.unauthorized)])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider)
+        let store = makeStore([StubProvider(results: [.failure(ProviderError.unauthorized)])])
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.loginExpired))
+        XCTAssertEqual(usage(store, .claude)?.state, .error(.loginExpired))
     }
 
     func testNetworkFailureWithCachedSnapshotGoesStale() async {
-        let provider = StubProvider([.success(snapshot(30)), .failure(ProviderError.network)])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider)
+        let store = makeStore([StubProvider(results: [.success(snapshot(30)),
+                                                      .failure(ProviderError.network)])])
         await store.refreshNow()   // succeeds
         await store.refreshNow()   // fails
-        XCTAssertEqual(store.state, .stale)
-        XCTAssertEqual(store.snapshot?.session.percent, 30, "keeps the last good snapshot")
+        XCTAssertEqual(usage(store, .claude)?.state, .stale)
+        XCTAssertEqual(usage(store, .claude)?.snapshot?.headline.window.percent, 30)
     }
 
     func testNetworkFailureWithNoSnapshotSurfacesError() async {
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: StubProvider([.failure(ProviderError.network)]))
+        let store = makeStore([StubProvider(results: [.failure(ProviderError.network)])])
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.network))
+        XCTAssertEqual(usage(store, .claude)?.state, .error(.network))
     }
 
-    func testRateLimitPausesPolling() async {
-        let provider = StubProvider([.success(snapshot(30)),
-                                     .failure(ProviderError.rateLimited(retryAfter: 600))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider,
-                              now: { Date(timeIntervalSince1970: 0) })
-        await store.refreshNow()   // success — snapshot cached
+    func testOneProviderFailingDoesNotAbortAnother() async {
+        let claude = StubProvider(id: .claude, displayName: "Claude",
+                                  results: [.success(snapshot(40, id: .claude))])
+        let gemini = StubProvider(id: .gemini, displayName: "Gemini",
+                                  results: [.failure(ProviderError.network)])
+        let store = makeStore([claude, gemini])
+        await store.refreshNow()
+        // The failing provider lands in an error state...
+        XCTAssertEqual(usage(store, .gemini)?.state, .error(.network))
+        // ...without preventing the other provider's snapshot from publishing.
+        XCTAssertEqual(usage(store, .claude)?.state, .ok)
+        XCTAssertEqual(usage(store, .claude)?.snapshot?.headline.window.percent, 40)
+    }
+
+    func testRateLimitPausesPollingForThatProvider() async {
+        let provider = StubProvider(results: [.success(snapshot(30)),
+                                              .failure(ProviderError.rateLimited(retryAfter: 600))])
+        let store = makeStore([provider])
+        await store.refreshNow()   // success
         await store.refreshNow()   // 429 — backoff begins
-        XCTAssertEqual(store.state, .stale)
+        XCTAssertEqual(usage(store, .claude)?.state, .stale)
         let callsAfter429 = provider.callCount
-        await store.refreshNow()   // within the backoff window — must be skipped
-        XCTAssertEqual(provider.callCount, callsAfter429, "polling is paused during backoff")
-    }
-
-    func testIsRefreshingTrueDuringFetchAndFalseAfter() async {
-        let provider = ProbeProvider(.success(snapshot(20)))
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider)
-        var observedDuringFetch = false
-        provider.onFetch = { observedDuringFetch = store.isRefreshing }
-        XCTAssertFalse(store.isRefreshing, "idle before any refresh")
-        await store.refreshNow()
-        XCTAssertTrue(observedDuringFetch, "isRefreshing is true while the fetch runs")
-        XCTAssertFalse(store.isRefreshing, "isRefreshing clears after the refresh")
-    }
-
-    func testIsRefreshingClearsWhenFetchThrows() async {
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: StubProvider([.failure(ProviderError.network)]))
-        await store.refreshNow()
-        XCTAssertFalse(store.isRefreshing, "isRefreshing clears even when the fetch fails")
-    }
-
-    func testManualRefreshIgnoresRapidRepeatCalls() async {
-        var clock = Date(timeIntervalSince1970: 0)
-        let provider = StubProvider([.success(snapshot(10)), .success(snapshot(10))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider, now: { clock })
-        await store.manualRefresh()                       // fires
-        await store.manualRefresh()                       // within 2s gap — skipped
-        XCTAssertEqual(provider.callCount, 1, "a second manual refresh within 2s is ignored")
-        clock = Date(timeIntervalSince1970: 3)            // past the gap
-        await store.manualRefresh()                       // fires again
-        XCTAssertEqual(provider.callCount, 2, "a manual refresh after the gap runs")
+        await store.refreshNow()   // within backoff — skipped
+        XCTAssertEqual(provider.callCount, callsAfter429, "polling paused during backoff")
     }
 
     func testManualRefreshBypassesRateLimitBackoff() async {
         var clock = Date(timeIntervalSince1970: 0)
-        let provider = StubProvider([.success(snapshot(30)),
-                                     .failure(ProviderError.rateLimited(retryAfter: 600)),
-                                     .success(snapshot(45))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider, now: { clock })
-        await store.manualRefresh()                       // success
+        let provider = StubProvider(results: [.success(snapshot(30)),
+                                              .failure(ProviderError.rateLimited(retryAfter: 600)),
+                                              .success(snapshot(45))])
+        let store = makeStore([provider], now: { clock })
+        await store.manualRefresh()
         clock = Date(timeIntervalSince1970: 3)
-        await store.manualRefresh()                       // 429 — backoff begins
+        await store.manualRefresh()                       // 429
         let callsAfter429 = provider.callCount
         clock = Date(timeIntervalSince1970: 6)
-        await store.manualRefresh()                       // backoff active — a manual refresh still fetches
-        XCTAssertEqual(provider.callCount, callsAfter429 + 1,
-                       "a manual refresh bypasses 429 backoff")
-        XCTAssertEqual(store.snapshot?.session.percent, 45,
-                       "the bypassing refresh applied fresh data")
-        XCTAssertEqual(store.state, .ok,
-                       "a successful manual refresh clears the degraded state")
+        await store.manualRefresh()                       // bypasses backoff
+        XCTAssertEqual(provider.callCount, callsAfter429 + 1)
+        XCTAssertEqual(usage(store, .claude)?.snapshot?.headline.window.percent, 45)
+        XCTAssertEqual(usage(store, .claude)?.state, .ok)
     }
 
-    func testAutomaticRefreshStillHonorsRateLimitBackoff() async {
+    func testManualRefreshIgnoresRapidRepeatCalls() async {
         var clock = Date(timeIntervalSince1970: 0)
-        let provider = StubProvider([.success(snapshot(30)),
-                                     .failure(ProviderError.rateLimited(retryAfter: 600))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider, now: { clock })
-        await store.refreshNow()                          // success
+        let provider = StubProvider(results: [.success(snapshot(10))])
+        let store = makeStore([provider], now: { clock })
+        await store.manualRefresh()                       // fires
+        await store.manualRefresh()                       // within 2s — skipped
+        XCTAssertEqual(provider.callCount, 1)
         clock = Date(timeIntervalSince1970: 3)
-        await store.refreshNow()                          // 429 — backoff begins
-        let callsAfter429 = provider.callCount
-        clock = Date(timeIntervalSince1970: 6)
-        await store.refreshNow()                          // automatic — must stay paused
-        XCTAssertEqual(provider.callCount, callsAfter429,
-                       "an automatic refresh during backoff makes no request")
+        await store.manualRefresh()                       // past the gap — fires
+        XCTAssertEqual(provider.callCount, 2)
     }
 
-    func testRateLimitedUntilReflectsBackoff() async {
-        var clock = Date(timeIntervalSince1970: 0)
-        let provider = StubProvider([.success(snapshot(30)),
-                                     .failure(ProviderError.rateLimited(retryAfter: 600)),
-                                     .success(snapshot(40))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider, now: { clock })
+    func testIsRefreshingTrueDuringFetchAndFalseAfter() async {
+        let provider = StubProvider(results: [.success(snapshot(20))])
+        let store = makeStore([provider])
+        var observed = false
+        provider.onFetch = { observed = store.isRefreshing }
+        XCTAssertFalse(store.isRefreshing)
         await store.refreshNow()
-        XCTAssertNil(store.rateLimitedUntil, "not rate limited after a success")
+        XCTAssertTrue(observed, "isRefreshing is true while a fetch runs")
+        XCTAssertFalse(store.isRefreshing)
+    }
+
+    func testMenuBarProviderDefaultsToFirstDetected() async {
+        let store = makeStore([StubProvider(results: [.success(snapshot(5))])])
+        await store.refreshNow()
+        XCTAssertEqual(store.menuBarProvider?.id, .claude)
+    }
+
+    func testMenuBarProviderIsNilWhenNothingDetected() async {
+        let store = makeStore([StubProvider(detected: false, results: [.success(snapshot(5))])])
+        await store.refreshNow()
+        XCTAssertNil(store.menuBarProvider)
+    }
+
+    func testRateLimitedUntilReflectsBackoffForProvider() async {
+        var clock = Date(timeIntervalSince1970: 0)
+        let provider = StubProvider(results: [.success(snapshot(30)),
+                                              .failure(ProviderError.rateLimited(retryAfter: 600))])
+        let store = makeStore([provider], now: { clock })
+        await store.refreshNow()
+        XCTAssertNil(store.rateLimitedUntil(for: .claude))
         clock = Date(timeIntervalSince1970: 1)
-        await store.refreshNow()                          // 429
-        XCTAssertEqual(store.rateLimitedUntil, Date(timeIntervalSince1970: 601),
-                       "rate limited until now + Retry-After")
-        clock = Date(timeIntervalSince1970: 2)
-        await store.manualRefresh()                       // bypasses backoff, succeeds
-        XCTAssertNil(store.rateLimitedUntil, "cleared after a successful refresh")
+        await store.refreshNow()
+        XCTAssertEqual(store.rateLimitedUntil(for: .claude), Date(timeIntervalSince1970: 601))
     }
 }

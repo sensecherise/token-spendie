@@ -1,7 +1,7 @@
 import Foundation
 
 /// Fetches usage from the dedicated `/api/oauth/usage` endpoint.
-struct EndpointUsageProvider: UsageProvider {
+struct EndpointUsageProvider: ClaudeUsageEndpoint {
     private let transport: HTTPTransport
     private let now: () -> Date
     private let url = URL(string: "https://api.anthropic.com/api/oauth/usage")!

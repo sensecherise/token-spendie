@@ -7,6 +7,8 @@ struct UsageBarRow: View {
     let window: UsageWindow
     let resetLine: String
     var theme: Theme
+    /// An optional data-quality note rendered snug under the reset line.
+    var caption: String? = nil
 
     private var level: UsageLevel { UsageLevel.forPercent(window.percent) }
     private var tierColor: Color { theme.color(for: level) }
@@ -33,6 +35,11 @@ struct UsageBarRow: View {
             Text(resetLine)
                 .font(.system(size: 10))
                 .foregroundStyle(Color.secondary)
+            if let caption {
+                Text(caption)
+                    .font(.system(size: 9))
+                    .foregroundStyle(Color.secondary.opacity(0.8))
+            }
         }
     }
 }
@@ -149,9 +156,9 @@ private struct RefreshIndicator: View {
     private var statusText: some View {
         switch RefreshStatusResolver.resolve(
             isFetching: spinning,
-            snapshotFetchedAt: store.snapshot?.fetchedAt,
-            rateLimitedUntil: store.rateLimitedUntil,
-            isStale: store.state == .stale,
+            snapshotFetchedAt: store.menuBarProvider?.snapshot?.fetchedAt,
+            rateLimitedUntil: store.menuBarProvider.flatMap { store.rateLimitedUntil(for: $0.id) },
+            isStale: store.menuBarProvider?.state == .stale,
             now: Date()
         ) {
         case .idle:
@@ -265,7 +272,79 @@ private struct MenuActionRow: View {
     }
 }
 
-/// The full detail panel: header, usage rows, actions section, status strip.
+/// The icon + copy shown for a provider error, or for the no-provider state.
+/// A free function so both `DetailPanelView` and `ProviderSection` use it.
+private func panelMessage(for kind: UsageError) -> some View {
+    let (icon, text): (String, String) = {
+        switch kind {
+        case .claudeCodeNotFound:
+            return ("🔌", "Claude Code not found. Install and log in to Claude Code, then this widget picks up your usage automatically.")
+        case .keychainAccessDenied:
+            return ("🔑", "Keychain access needed. The widget reads your Claude login token from the Keychain — click refresh and choose Allow.")
+        case .loginExpired:
+            return ("⏱", "Login expired. Run any Claude Code command to refresh your session — the widget recovers on its own after that.")
+        case .network:
+            return ("📡", "Can't reach the usage service. The widget will keep retrying.")
+        case .badResponse:
+            return ("⚠️", "Couldn't read usage data. The usage source returned something unexpected — the widget will keep retrying.")
+        }
+    }()
+    return HStack(alignment: .top, spacing: 8) {
+        Text(icon).font(.system(size: 15))
+        Text(text).font(.system(size: 11)).foregroundStyle(.primary.opacity(0.85))
+    }
+}
+
+/// One provider's panel section: an uppercase name heading followed by its
+/// usage rows, or an error / loading message.
+private struct ProviderSection: View {
+    let provider: ProviderUsage
+    var theme: Theme
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 13) {
+            Text(provider.displayName.uppercased())
+                .font(.system(size: 10, weight: .heavy)).kerning(0.5)
+                .foregroundStyle(.secondary)
+            switch provider.state {
+            case .error(let kind):
+                panelMessage(for: kind)
+            case .loading where provider.snapshot == nil:
+                Text("Loading usage…")
+                    .font(.system(size: 12)).foregroundStyle(.secondary)
+            default:
+                if let snapshot = provider.snapshot {
+                    ForEach(snapshot.windows.indices, id: \.self) { index in
+                        let labeled = snapshot.windows[index]
+                        UsageBarRow(title: labeled.label,
+                                    subtitle: labeled.detail,
+                                    window: labeled.window,
+                                    resetLine: resetLine(for: labeled),
+                                    theme: theme,
+                                    caption: index == snapshot.windows.count - 1
+                                        ? snapshot.note : nil)
+                    }
+                }
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// Builds a row's reset line from a `LabeledWindow`, computed live so the
+    /// countdown stays current.
+    private func resetLine(for labeled: LabeledWindow) -> String {
+        let reset: String
+        switch labeled.resetStyle {
+        case .countdown:
+            reset = Formatting.resetCountdown(to: labeled.window.resetsAt, now: Date())
+        case .date:
+            reset = Formatting.resetDate(labeled.window.resetsAt)
+        }
+        return reset.isEmpty ? labeled.detail : "\(labeled.detail) · \(reset)"
+    }
+}
+
+/// The full detail panel: header, one section per provider, actions section.
 struct DetailPanelView: View {
     @ObservedObject var store: UsageStore
     @ObservedObject var preferences: Preferences
@@ -277,7 +356,7 @@ struct DetailPanelView: View {
         VStack(alignment: .leading, spacing: 0) {
             header
             Divider()
-            content.padding(13)
+            content
             Divider()
             actions
         }
@@ -294,53 +373,20 @@ struct DetailPanelView: View {
         .padding(.horizontal, 10).padding(.vertical, 6)
     }
 
+    /// One labelled section per detected provider, full-width divider between.
+    /// Empty when nothing is detected.
     @ViewBuilder
     private var content: some View {
-        switch store.state {
-        case .error(let kind):
-            messageView(for: kind)
-        case .loading where store.snapshot == nil:
-            Text("Loading usage…").font(.system(size: 12)).foregroundStyle(.secondary)
-        default:
-            if let snapshot = store.snapshot {
-                VStack(alignment: .leading, spacing: 13) {
-                    UsageBarRow(title: "Session", subtitle: "5-hour window",
-                                window: snapshot.session,
-                                resetLine: "5-hour window · " + Formatting.resetCountdown(to: snapshot.session.resetsAt, now: Date()),
-                                theme: preferences.theme)
-                    UsageBarRow(title: "Weekly", subtitle: "all models",
-                                window: snapshot.weekly,
-                                resetLine: "all models · " + Formatting.resetDate(snapshot.weekly.resetsAt),
-                                theme: preferences.theme)
-                    ForEach(snapshot.modelWeeklies, id: \.model) { item in
-                        UsageBarRow(title: "Weekly · \(item.model)", subtitle: item.model,
-                                    window: item.window,
-                                    resetLine: "\(item.model) only · " + Formatting.resetDate(item.window.resetsAt),
-                                    theme: preferences.theme)
-                    }
+        if store.providers.isEmpty {
+            panelMessage(for: .claudeCodeNotFound).padding(13)
+        } else {
+            ForEach(Array(store.providers.enumerated()), id: \.element.id) { index, provider in
+                ProviderSection(provider: provider, theme: preferences.theme)
+                    .padding(13)
+                if index < store.providers.count - 1 {
+                    Divider()
                 }
             }
-        }
-    }
-
-    private func messageView(for kind: UsageError) -> some View {
-        let (icon, text): (String, String) = {
-            switch kind {
-            case .claudeCodeNotFound:
-                return ("🔌", "Claude Code not found. Install and log in to Claude Code, then this widget picks up your usage automatically.")
-            case .keychainAccessDenied:
-                return ("🔑", "Keychain access needed. The widget reads your Claude login token from the Keychain — click refresh and choose Allow.")
-            case .loginExpired:
-                return ("⏱", "Login expired. Run any Claude Code command to refresh your session — the widget recovers on its own after that.")
-            case .network:
-                return ("📡", "Can't reach the usage service. The widget will keep retrying.")
-            case .badResponse:
-                return ("⚠️", "Couldn't read usage data. The usage source returned something unexpected — the widget will keep retrying.")
-            }
-        }()
-        return HStack(alignment: .top, spacing: 8) {
-            Text(icon).font(.system(size: 15))
-            Text(text).font(.system(size: 11)).foregroundStyle(.primary.opacity(0.85))
         }
     }
 

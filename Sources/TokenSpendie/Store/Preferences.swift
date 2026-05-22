@@ -27,6 +27,10 @@ final class Preferences: ObservableObject {
     @Published var refreshInterval: RefreshInterval { didSet { defaults.set(refreshInterval.rawValue, forKey: Keys.refreshInterval) } }
     @Published var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) } }
     @Published var theme: Theme { didSet { defaults.set(theme.rawValue, forKey: Keys.theme) } }
+    /// Which provider's ring rides the menu bar.
+    @Published var menuBarProviderID: ProviderID {
+        didSet { defaults.set(menuBarProviderID.rawValue, forKey: Keys.menuBarProviderID) }
+    }
 
     private enum Keys {
         static let showMenuBar = "showMenuBar"
@@ -34,6 +38,7 @@ final class Preferences: ObservableObject {
         static let refreshInterval = "refreshInterval"
         static let launchAtLogin = "launchAtLogin"
         static let theme = "theme"
+        static let menuBarProviderID = "menuBarProviderID"
     }
 
     init(defaults: UserDefaults = .standard) {
@@ -45,5 +50,7 @@ final class Preferences: ObservableObject {
         self.launchAtLogin = defaults.object(forKey: Keys.launchAtLogin) as? Bool ?? false
         let storedTheme = defaults.string(forKey: Keys.theme)
         self.theme = storedTheme.flatMap(Theme.init(rawValue:)) ?? .default
+        let storedProviderID = defaults.string(forKey: Keys.menuBarProviderID)
+        self.menuBarProviderID = storedProviderID.flatMap(ProviderID.init(rawValue:)) ?? .claude
     }
 }
