@@ -1,4 +1,4 @@
-# Claude Usage Widget
+# Token Spendie
 
 A macOS menu bar widget that shows your Claude Code usage — the 5-hour session
 window and weekly caps — in real time.
@@ -9,11 +9,11 @@ Requires the Swift toolchain (Xcode Command Line Tools). No Xcode needed.
 
     ./build.sh
 
-This produces `build/ClaudeUsage.app` and `build/ClaudeUsage.zip`.
+This produces `build/TokenSpendie.app` and `build/TokenSpendie.zip`.
 
 ## Install
 
-1. Unzip `ClaudeUsage.zip` and move `ClaudeUsage.app` to `/Applications`.
+1. Unzip `TokenSpendie.zip` and move `TokenSpendie.app` to `/Applications`.
 2. **First launch:** right-click the app → **Open**, then confirm. This is
    required once because the app is not notarized.
 3. When macOS asks for Keychain access, choose **Allow** — the widget reads your
@@ -34,5 +34,5 @@ This produces `build/ClaudeUsage.app` and `build/ClaudeUsage.zip`.
 
 ## Sharing with friends
 
-Send them `ClaudeUsage.zip`. They follow the same Install steps. Each machine
+Send them `TokenSpendie.zip`. They follow the same Install steps. Each machine
 uses its own Claude Code login automatically — there is nothing to configure.
