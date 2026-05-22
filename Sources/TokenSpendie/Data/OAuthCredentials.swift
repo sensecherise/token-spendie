@@ -43,4 +43,7 @@ enum OAuthCredentialsParser {
 /// Abstraction over credential storage so the store can be tested without the Keychain.
 protocol CredentialStore {
     func loadCredentials() throws -> OAuthCredentials
+    /// True if the credential item exists, without reading its secret data —
+    /// so it never triggers the Keychain consent prompt.
+    func credentialsExist() -> Bool
 }
