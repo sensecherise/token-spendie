@@ -176,7 +176,7 @@ struct DetailPanelView: View {
 
     private var header: some View {
         HStack {
-            Text("CLAUDE USAGE")
+            Text("TOKEN SPENDIE")
                 .font(.system(size: 10, weight: .heavy)).kerning(0.5)
             Spacer()
             RefreshButton(store: store, onRefresh: onRefresh)

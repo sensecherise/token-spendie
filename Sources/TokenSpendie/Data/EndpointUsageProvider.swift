@@ -17,7 +17,7 @@ struct EndpointUsageProvider: UsageProvider {
         request.httpMethod = "GET"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
         request.setValue("application/json", forHTTPHeaderField: "Accept")
-        request.setValue("ClaudeUsageWidget/1.0", forHTTPHeaderField: "User-Agent")
+        request.setValue("TokenSpendie/1.0", forHTTPHeaderField: "User-Agent")
 
         let (data, response) = try await transport(request)
         switch response.statusCode {

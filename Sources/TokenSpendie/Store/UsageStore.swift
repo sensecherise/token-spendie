@@ -233,7 +233,7 @@ final class UsageStore: ObservableObject {
                 if reconnected { await self.refreshNow() }
             }
         }
-        pathMonitor.start(queue: DispatchQueue(label: "ClaudeUsage.network"))
+        pathMonitor.start(queue: DispatchQueue(label: "TokenSpendie.network"))
     }
 
     deinit {

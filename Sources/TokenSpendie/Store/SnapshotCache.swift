@@ -4,10 +4,10 @@ import Foundation
 struct SnapshotCache {
     let fileURL: URL
 
-    /// Default location: ~/Library/Application Support/ClaudeUsage/last-snapshot.json
+    /// Default location: ~/Library/Application Support/TokenSpendie/last-snapshot.json
     static func defaultURL() -> URL {
         let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("ClaudeUsage", isDirectory: true)
+            .appendingPathComponent("TokenSpendie", isDirectory: true)
         try? FileManager.default.createDirectory(at: base, withIntermediateDirectories: true)
         return base.appendingPathComponent("last-snapshot.json")
     }

@@ -36,7 +36,7 @@ struct PreferencesView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("Claude Usage Widget").font(.system(size: 14, weight: .bold))
+            Text("Token Spendie").font(.system(size: 14, weight: .bold))
 
             VStack(alignment: .leading, spacing: 8) {
                 Text("DISPLAY").font(.system(size: 10, weight: .heavy)).foregroundStyle(.secondary)

@@ -37,7 +37,7 @@ var request = URLRequest(url: URL(string: "https://api.anthropic.com/api/oauth/u
 request.httpMethod = "GET"
 request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
 request.setValue("application/json", forHTTPHeaderField: "Accept")
-request.setValue("ClaudeUsageWidget/probe", forHTTPHeaderField: "User-Agent")
+request.setValue("TokenSpendie/probe", forHTTPHeaderField: "User-Agent")
 
 let semaphore = DispatchSemaphore(value: 0)
 URLSession.shared.dataTask(with: request) { data, response, error in

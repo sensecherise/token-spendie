@@ -6,7 +6,7 @@ import Security
 final class ManualTokenStore: CredentialStore {
     let service: String
 
-    init(service: String = "com.cherise.ClaudeUsage.token") {
+    init(service: String = "com.cherise.TokenSpendie.token") {
         self.service = service
     }
 

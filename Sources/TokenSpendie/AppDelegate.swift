@@ -96,7 +96,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 320),
             styleMask: [.titled, .closable], backing: .buffered, defer: false
         )
-        window.title = "Claude Usage Widget"
+        window.title = "Token Spendie"
         window.contentViewController = NSHostingController(rootView: view)
         window.isReleasedWhenClosed = false
         window.center()
