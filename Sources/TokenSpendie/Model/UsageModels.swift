@@ -24,8 +24,9 @@ struct UsageSnapshot: Codable, Equatable {
 
 /// A user-facing failure. Each maps to a distinct widget state.
 enum UsageError: Error, Equatable {
-    case noToken                // no API token entered
-    case tokenInvalid           // HTTP 401 — token invalid or expired
+    case claudeCodeNotFound     // no Keychain item / Claude Code not logged in
+    case keychainAccessDenied   // user denied the Keychain access prompt
+    case loginExpired           // 401 even after re-reading the Keychain
     case network                // offline / unreachable
     case badResponse            // non-200 or unparseable payload
 }

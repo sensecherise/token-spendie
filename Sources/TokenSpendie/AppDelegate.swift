@@ -4,7 +4,6 @@ import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var preferences: Preferences!
-    private var tokenStore: TokenStore!
     private var store: UsageStore!
     private var menuBar: MenuBarController!
     private var floatingPanel: FloatingPanelController!
@@ -14,10 +13,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
         preferences = Preferences()
-        tokenStore = TokenStore()
         store = UsageStore(
             provider: EndpointUsageProvider(),
-            tokenStore: tokenStore,
+            credentials: KeychainReader(),
             cache: SnapshotCache(fileURL: SnapshotCache.defaultURL()),
             preferences: preferences
         )
@@ -28,7 +26,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                onOpenSettings: { [weak self] in self?.showSettings() },
                                                onQuit: { NSApp.terminate(nil) })
 
-        installEditMenu()
         applyDisplayPreferences()
         store.start()
 
@@ -39,25 +36,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.applyDisplayPreferences()
             }
             .store(in: &cancellables)
-    }
-
-    /// Installs a minimal Edit menu. This app is an `LSUIElement` accessory app
-    /// with no visible menu bar, but without a main menu the standard
-    /// Cmd-X/C/V/A key equivalents have no route to the focused text field —
-    /// so the token field could not be pasted into. The menu stays hidden;
-    /// only its key equivalents matter.
-    @MainActor
-    private func installEditMenu() {
-        let mainMenu = NSMenu()
-        let editItem = NSMenuItem()
-        mainMenu.addItem(editItem)
-        let editMenu = NSMenu(title: "Edit")
-        editItem.submenu = editMenu
-        editMenu.addItem(withTitle: "Cut", action: #selector(NSText.cut(_:)), keyEquivalent: "x")
-        editMenu.addItem(withTitle: "Copy", action: #selector(NSText.copy(_:)), keyEquivalent: "c")
-        editMenu.addItem(withTitle: "Paste", action: #selector(NSText.paste(_:)), keyEquivalent: "v")
-        editMenu.addItem(withTitle: "Select All", action: #selector(NSText.selectAll(_:)), keyEquivalent: "a")
-        NSApp.mainMenu = mainMenu
     }
 
     /// Shows/hides each surface to match preferences.
@@ -76,13 +54,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let view = PreferencesView(
             preferences: preferences,
-            tokenStore: tokenStore,
             onDisplayChanged: { [weak self] in self?.applyDisplayPreferences() },
-            onIntervalChanged: { [weak self] in self?.store.rescheduleTimer() },
-            onTokenChanged: { [weak self] in
-                guard let self else { return }
-                Task { await self.store.refreshNow() }
-            }
+            onIntervalChanged: { [weak self] in self?.store.rescheduleTimer() }
         )
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 320),

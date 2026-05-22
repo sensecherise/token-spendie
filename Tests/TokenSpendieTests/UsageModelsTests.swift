@@ -16,6 +16,6 @@ final class UsageModelsTests: XCTestCase {
 
     func testLoadStateEquatable() {
         XCTAssertEqual(LoadState.error(.network), LoadState.error(.network))
-        XCTAssertNotEqual(LoadState.error(.network), LoadState.error(.tokenInvalid))
+        XCTAssertNotEqual(LoadState.error(.network), LoadState.error(.loginExpired))
     }
 }

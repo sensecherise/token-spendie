@@ -19,7 +19,7 @@ final class UsageStore: ObservableObject {
     @Published private(set) var isRefreshing = false
 
     private let provider: UsageProvider
-    private let tokenStore: TokenStore
+    private let credentials: CredentialStore
     private let cache: SnapshotCache
     private let preferences: Preferences
     private let now: () -> Date
@@ -43,12 +43,12 @@ final class UsageStore: ObservableObject {
     private var networkWasSatisfied = true
 
     init(provider: UsageProvider,
-         tokenStore: TokenStore,
+         credentials: CredentialStore,
          cache: SnapshotCache,
          preferences: Preferences,
          now: @escaping () -> Date = Date.init) {
         self.provider = provider
-        self.tokenStore = tokenStore
+        self.credentials = credentials
         self.cache = cache
         self.preferences = preferences
         self.now = now
@@ -77,30 +77,35 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    /// Performs one refresh cycle. Returns immediately — making no request —
-    /// when no token is configured; this is what prevents an empty bearer from
-    /// reaching the endpoint and coming back as a mislabeled 429.
+    /// Performs one refresh cycle: load credentials, fetch, retry once on 401.
     /// `ignoringBackoff` lets a user-initiated refresh proceed during 429
     /// backoff; automatic callers leave it `false` so polling stays paused.
     func refreshNow(ignoringBackoff: Bool = false) async {
         if !ignoringBackoff, let backoffUntil, now() < backoffUntil { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        guard let token = tokenStore.token else {
-            state = .error(.noToken)
-            return
-        }
         if snapshot == nil { state = .loading }
         do {
-            apply(try await provider.fetchUsage(accessToken: token))
+            let creds = try credentials.loadCredentials()
+            do {
+                apply(try await provider.fetchUsage(accessToken: creds.accessToken))
+            } catch ProviderError.unauthorized {
+                // Re-read the Keychain once — Claude Code refreshes the token during normal use.
+                let refreshed = try credentials.loadCredentials()
+                apply(try await provider.fetchUsage(accessToken: refreshed.accessToken))
+            }
         } catch ProviderError.unauthorized {
-            state = .error(.tokenInvalid)
+            state = .error(.loginExpired)
         } catch ProviderError.network {
             degrade(to: .network)
         } catch ProviderError.badResponse {
             degrade(to: .badResponse)
         } catch ProviderError.rateLimited(let retryAfter) {
             applyRateLimitBackoff(retryAfter: retryAfter)
+        } catch CredentialError.notFound, CredentialError.malformed {
+            state = .error(.claudeCodeNotFound)
+        } catch CredentialError.accessDenied {
+            state = .error(.keychainAccessDenied)
         } catch {
             degrade(to: .badResponse)
         }
