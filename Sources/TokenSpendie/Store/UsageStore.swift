@@ -107,8 +107,9 @@ final class UsageStore: ObservableObject {
         // Drop rows for providers no longer detected.
         usageByID = usageByID.filter { detectedIDs.contains($0.key) }
 
-        // Sequential in Phase 1 (one provider). Phase 2 introduces concurrent
-        // fetches once a second provider exists.
+        // Fetched sequentially. Each provider is cheap — Claude is a single
+        // HTTP call, Gemini is a local file scan — so concurrency would not
+        // be worth the added complexity.
         for provider in detected {
             await refresh(provider, ignoringBackoff: ignoringBackoff)
         }

@@ -105,8 +105,18 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(usage(store, .claude)?.state, .error(.network))
     }
 
-    func testOneProviderFailingDoesNotAbortAnother() throws {
-        throw XCTSkip("Multi-provider isolation — deferred to Phase 2, when a second ProviderID exists")
+    func testOneProviderFailingDoesNotAbortAnother() async {
+        let claude = StubProvider(id: .claude, displayName: "Claude",
+                                  results: [.success(snapshot(40, id: .claude))])
+        let gemini = StubProvider(id: .gemini, displayName: "Gemini",
+                                  results: [.failure(ProviderError.network)])
+        let store = makeStore([claude, gemini])
+        await store.refreshNow()
+        // The failing provider lands in an error state...
+        XCTAssertEqual(usage(store, .gemini)?.state, .error(.network))
+        // ...without preventing the other provider's snapshot from publishing.
+        XCTAssertEqual(usage(store, .claude)?.state, .ok)
+        XCTAssertEqual(usage(store, .claude)?.snapshot?.headline.window.percent, 40)
     }
 
     func testRateLimitPausesPollingForThatProvider() async {
