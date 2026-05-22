@@ -18,4 +18,10 @@ final class UsageModelsTests: XCTestCase {
         XCTAssertEqual(LoadState.error(.network), LoadState.error(.network))
         XCTAssertNotEqual(LoadState.error(.network), LoadState.error(.loginExpired))
     }
+
+    func testProviderIDIncludesGeminiAndRoundTrips() throws {
+        XCTAssertTrue(ProviderID.allCases.contains(.gemini))
+        let data = try JSONEncoder().encode([ProviderID.gemini])
+        XCTAssertEqual(try JSONDecoder().decode([ProviderID].self, from: data), [.gemini])
+    }
 }

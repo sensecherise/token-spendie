@@ -31,4 +31,16 @@ struct KeychainReader: CredentialStore {
             throw CredentialError.accessDenied
         }
     }
+
+    func credentialsExist() -> Bool {
+        // kSecReturnData:false asks only whether the item exists. Returning
+        // attributes (not the secret) does not prompt for user consent.
+        let query: [String: Any] = [
+            kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service,
+            kSecReturnData as String: false,
+            kSecMatchLimit as String: kSecMatchLimitOne,
+        ]
+        return SecItemCopyMatching(query as CFDictionary, nil) == errSecSuccess
+    }
 }

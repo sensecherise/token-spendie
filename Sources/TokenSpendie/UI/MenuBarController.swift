@@ -58,21 +58,27 @@ final class MenuBarController: NSObject {
         statusItem = nil
     }
 
-    /// Updates the status button's image + title from the current store state.
+    /// Updates the status button's image + title from the menu-bar provider.
     private func refreshButton() {
         guard let button = statusItem?.button else { return }
-        switch store.state {
+        guard let provider = store.menuBarProvider else {
+            // No provider detected — same as the old `claudeCodeNotFound` state.
+            button.image = nil
+            button.title = "✳ –"
+            return
+        }
+        switch provider.state {
         case .error(.claudeCodeNotFound):
             button.image = nil
             button.title = "✳ –"
         case .error:
             button.image = nil
             button.title = "✳ !"
-        case .loading where store.snapshot == nil:
+        case .loading where provider.snapshot == nil:
             button.image = nil
             button.title = "✳ …"
         default:
-            let percent = store.snapshot?.session.percent ?? 0
+            let percent = provider.snapshot?.headline.window.percent ?? 0
             let color = NSColor(preferences.theme.color(for: UsageLevel.forPercent(percent)))
             button.image = Self.ringImage(percent: percent, color: color)
             button.title = " \(Int(percent.rounded()))%"
@@ -161,7 +167,6 @@ final class MenuBarController: NSObject {
         panel.makeKeyAndOrderFront(nil)
         self.panel = panel
         button.highlight(true)
-        store.setPanelVisible(true, source: .menuBar)
 
         // Dismiss when the user clicks anywhere outside the panel.
         clickMonitor = NSEvent.addGlobalMonitorForEvents(
@@ -180,6 +185,5 @@ final class MenuBarController: NSObject {
         panel?.orderOut(nil)
         guard panel != nil else { return }
         panel = nil
-        store.setPanelVisible(false, source: .menuBar)
     }
 }

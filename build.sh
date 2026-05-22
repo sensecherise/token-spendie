@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
-# Builds TokenSpendie.app and a shareable zip.
+# Builds TokenSpendie.app (ad-hoc signed, version-stamped).
+# Version comes from the VERSION env var; defaults to 0.0.0-dev.
 set -euo pipefail
 cd "$(dirname "$0")"
 
 APP="build/TokenSpendie.app"
 BIN_NAME="TokenSpendie"
+VERSION="${VERSION:-0.0.0-dev}"
 
 echo "==> Compiling (release)"
 swift build -c release
@@ -26,7 +28,11 @@ cp ".build/release/$BIN_NAME" "$APP/Contents/MacOS/$BIN_NAME"
 cp Resources/Info.plist "$APP/Contents/Info.plist"
 cp build/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
 
-echo "==> Zipping for sharing"
-( cd build && rm -f TokenSpendie.zip && ditto -c -k --keepParent TokenSpendie.app TokenSpendie.zip )
+echo "==> Stamping version $VERSION"
+/usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString '$VERSION'" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleVersion '$VERSION'" "$APP/Contents/Info.plist"
 
-echo "==> Done: $APP  and  build/TokenSpendie.zip"
+echo "==> Ad-hoc signing"
+codesign --force --sign - "$APP"
+
+echo "==> Done: $APP"

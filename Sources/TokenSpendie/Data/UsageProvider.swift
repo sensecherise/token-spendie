@@ -18,7 +18,19 @@ enum DefaultTransport {
     }
 }
 
-/// Fetches a usage snapshot given a valid access token.
-protocol UsageProvider {
+/// The raw Claude usage HTTP call: given a valid access token, returns a
+/// decoded `UsageSnapshot`. Implemented by `EndpointUsageProvider`.
+protocol ClaudeUsageEndpoint {
     func fetchUsage(accessToken: String) async throws -> UsageSnapshot
+}
+
+/// One trackable AI CLI. Each conformer owns its own credential discovery and
+/// fetch, and returns a normalized `ProviderSnapshot`.
+protocol UsageProvider {
+    var id: ProviderID { get }
+    var displayName: String { get }
+    /// Are this CLI's credentials present? Must be cheap and must not trigger
+    /// a credential-consent prompt.
+    func detectCredentials() -> Bool
+    func fetchUsage() async throws -> ProviderSnapshot
 }

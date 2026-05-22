@@ -3,164 +3,131 @@ import Combine
 import Network
 import AppKit
 
-/// A display surface that can hold the detail view open.
-enum PanelSource {
-    case menuBar
-    case floating
-}
-
-/// Owns polling, the data pipeline, and the published widget state.
+/// Owns polling, the per-provider data pipeline, and the published widget
+/// state. Every registered `UsageProvider` is detected and polled
+/// independently; one provider failing never blocks another.
 @MainActor
 final class UsageStore: ObservableObject {
-    @Published private(set) var snapshot: UsageSnapshot?
-    @Published private(set) var state: LoadState = .loading
-    /// True while a refresh cycle is running. Drives the refresh icon's spin
-    /// animation and disables the button so it cannot be spammed.
+    /// One row per detected provider, in registration order.
+    @Published private(set) var providers: [ProviderUsage] = []
+    /// The provider whose ring rides the menu bar.
+    @Published private(set) var menuBarProviderID: ProviderID
+    /// True while any provider's refresh cycle is running.
     @Published private(set) var isRefreshing = false
 
-    private let provider: UsageProvider
-    private let credentials: CredentialStore
-    private let cache: SnapshotCache
+    private let registered: [UsageProvider]
+    private let caches: [ProviderID: SnapshotCache]
     private let preferences: Preferences
     private let now: () -> Date
 
+    /// Per-provider runtime bookkeeping, keyed by provider id.
+    private var usageByID: [ProviderID: ProviderUsage] = [:]
+    private var backoffUntil: [ProviderID: Date] = [:]
+    private var consecutiveRateLimits: [ProviderID: Int] = [:]
+    private var lastSuccess: [ProviderID: Date] = [:]
+
     private var timer: Timer?
-    /// The display surfaces currently open. Used to decide whether to refresh
-    /// when a panel opens; the poll interval itself no longer depends on it.
-    private var visiblePanels: Set<PanelSource> = []
-    private var panelVisible: Bool { !visiblePanels.isEmpty }
-    private var lastSuccess: Date?
-    /// While set and in the future, polling is paused — set after an HTTP 429.
-    private var backoffUntil: Date?
-    private var consecutiveRateLimits = 0
-    /// Timestamp of the last user-initiated refresh. Manual refreshes within
-    /// `manualRefreshMinGap` of this are ignored, keeping the button un-spammable.
     private var lastManualRefresh: Date?
     private static let manualRefreshMinGap: TimeInterval = 2
     private let pathMonitor = NWPathMonitor()
-    /// Last known network reachability, used to detect reconnect transitions.
-    /// Main-actor isolated — only touched inside the `@MainActor` task below.
     private var networkWasSatisfied = true
 
-    init(provider: UsageProvider,
-         credentials: CredentialStore,
-         cache: SnapshotCache,
+    init(providers: [UsageProvider],
+         cacheFactory: (ProviderID) -> SnapshotCache = { SnapshotCache(fileURL: SnapshotCache.defaultURL(for: $0)) },
          preferences: Preferences,
          now: @escaping () -> Date = Date.init) {
-        self.provider = provider
-        self.credentials = credentials
-        self.cache = cache
+        self.registered = providers
+        self.caches = Dictionary(uniqueKeysWithValues: providers.map { ($0.id, cacheFactory($0.id)) })
         self.preferences = preferences
         self.now = now
+        self.menuBarProviderID = preferences.menuBarProviderID
     }
 
-    /// Loads the cached snapshot, begins polling, observes wake/network, and fires an initial fetch.
+    /// The detected provider shown in the menu bar — the stored choice if it is
+    /// still detected, else the first detected provider.
+    var menuBarProvider: ProviderUsage? {
+        providers.first { $0.id == menuBarProviderID } ?? providers.first
+    }
+
+    /// Picks the provider whose ring rides the menu bar; persists the choice.
+    func setMenuBarProvider(_ id: ProviderID) {
+        menuBarProviderID = id
+        preferences.menuBarProviderID = id
+    }
+
+    /// When a provider is in 429 backoff, the time the limit resets; else nil.
+    func rateLimitedUntil(for id: ProviderID) -> Date? {
+        guard let until = backoffUntil[id], now() < until else { return nil }
+        return until
+    }
+
+    /// Loads cached snapshots, begins polling, observes wake/network, fires an
+    /// initial fetch.
     func start() {
-        if let cached = cache.load() {
-            snapshot = cached
-            // A recently-cached snapshot counts as live, so a relaunch needs no
-            // immediate fetch — this avoids request bursts across restarts.
-            if now().timeIntervalSince(cached.fetchedAt) < 60 {
-                state = .ok
-                lastSuccess = cached.fetchedAt
+        for provider in registered {
+            if let cached = caches[provider.id]?.load() {
+                let fresh = now().timeIntervalSince(cached.fetchedAt) < 60
+                usageByID[provider.id] = ProviderUsage(
+                    id: provider.id, displayName: provider.displayName,
+                    state: fresh ? .ok : .stale, snapshot: cached)
+                if fresh { lastSuccess[provider.id] = cached.fetchedAt }
             } else {
-                state = .stale
+                // No cached snapshot yet — seed a loading row so a cold launch
+                // shows "Loading usage…" until the first fetch completes,
+                // matching the pre-refactor behavior.
+                usageByID[provider.id] = ProviderUsage(
+                    id: provider.id, displayName: provider.displayName,
+                    state: .loading, snapshot: nil)
             }
         }
+        // Publish cached rows immediately so launch has no empty flash.
+        publish(order: registered.map(\.id))
         NotificationCenter.default.addObserver(
             self, selector: #selector(systemDidWake),
             name: NSWorkspace.didWakeNotification, object: nil)
         observeNetwork()
         rescheduleTimer()
-        if state != .ok {
+        // Skip the initial fetch when every provider already has a fresh
+        // cached snapshot — avoids a request burst on every relaunch.
+        let needsImmediateFetch = registered.contains { usageByID[$0.id]?.state != .ok }
+        if needsImmediateFetch {
             Task { await refreshNow() }
         }
     }
 
-    /// Performs one refresh cycle: load credentials, fetch, retry once on 401.
-    /// `ignoringBackoff` lets a user-initiated refresh proceed during 429
-    /// backoff; automatic callers leave it `false` so polling stays paused.
+    /// One refresh cycle: detect every registered provider, then fetch each
+    /// detected provider. `ignoringBackoff` lets a user-initiated refresh
+    /// proceed during 429 backoff.
     func refreshNow(ignoringBackoff: Bool = false) async {
-        if !ignoringBackoff, let backoffUntil, now() < backoffUntil { return }
         isRefreshing = true
         defer { isRefreshing = false }
-        if snapshot == nil { state = .loading }
-        do {
-            let creds = try credentials.loadCredentials()
-            do {
-                apply(try await provider.fetchUsage(accessToken: creds.accessToken))
-            } catch ProviderError.unauthorized {
-                // Re-read the Keychain once — Claude Code refreshes the token during normal use.
-                let refreshed = try credentials.loadCredentials()
-                apply(try await provider.fetchUsage(accessToken: refreshed.accessToken))
-            }
-        } catch ProviderError.unauthorized {
-            state = .error(.loginExpired)
-        } catch ProviderError.network {
-            degrade(to: .network)
-        } catch ProviderError.badResponse {
-            degrade(to: .badResponse)
-        } catch ProviderError.rateLimited(let retryAfter) {
-            applyRateLimitBackoff(retryAfter: retryAfter)
-        } catch CredentialError.notFound, CredentialError.malformed {
-            state = .error(.claudeCodeNotFound)
-        } catch CredentialError.accessDenied {
-            state = .error(.keychainAccessDenied)
-        } catch {
-            degrade(to: .badResponse)
+
+        let detected = registered.filter { $0.detectCredentials() }
+        let detectedIDs = Set(detected.map(\.id))
+        // Drop rows for providers no longer detected.
+        usageByID = usageByID.filter { detectedIDs.contains($0.key) }
+
+        // Fetched sequentially. Each provider is cheap — Claude is a single
+        // HTTP call, Gemini is a local file scan — so concurrency would not
+        // be worth the added complexity.
+        for provider in detected {
+            await refresh(provider, ignoringBackoff: ignoringBackoff)
         }
+        publish(order: detected.map(\.id))
     }
 
-    /// A user-initiated refresh from the refresh button. Ignored while a refresh
-    /// is already running, or if the previous manual refresh was under
-    /// `manualRefreshMinGap` seconds ago — together these keep the button
-    /// un-spammable. Other refresh triggers (timer, wake, reconnect) bypass this
-    /// and call `refreshNow()` directly.
+    /// A user-initiated refresh from the refresh button. Refreshes every
+    /// provider, bypassing 429 backoff. Ignored while a refresh is already
+    /// running or within `manualRefreshMinGap` of the previous manual refresh.
     func manualRefresh() async {
         if isRefreshing { return }
-        if let lastManualRefresh,
-           now().timeIntervalSince(lastManualRefresh) < Self.manualRefreshMinGap {
-            return
-        }
-        // Stamped before the await, on purpose: the time-gap guard and the
-        // `isRefreshing` guard above are independent. A repeat call landing
-        // while this refresh is still in flight is dropped by `isRefreshing`,
-        // not the gap — both guards are needed to keep the button un-spammable.
+        if let last = lastManualRefresh,
+           now().timeIntervalSince(last) < Self.manualRefreshMinGap { return }
         lastManualRefresh = now()
-        // Bypass 429 backoff: the user is explicitly asking, the endpoint may
-        // have recovered, and the 2s gap above already caps the request rate.
         await refreshNow(ignoringBackoff: true)
     }
 
-    /// When the endpoint is rate-limiting us (HTTP 429), the time the limit
-    /// resets; `nil` otherwise. Lets the status line show "rate limited"
-    /// instead of "offline" — a 429 is not an outage.
-    var rateLimitedUntil: Date? {
-        guard let backoffUntil, now() < backoffUntil else { return nil }
-        return backoffUntil
-    }
-
-    /// Call when a display surface opens or closes. Tracked per source; opening
-    /// a surface triggers a refresh when the data is stale. Idempotent per source.
-    func setPanelVisible(_ visible: Bool, source: PanelSource) {
-        let wasVisible = panelVisible
-        if visible { visiblePanels.insert(source) } else { visiblePanels.remove(source) }
-        guard panelVisible != wasVisible else { return }
-        // Refresh on open only when the data is stale-ish, so opening and
-        // closing the panel repeatedly does not spam the endpoint.
-        if panelVisible, shouldRefreshOnOpen() {
-            Task { await refreshNow() }
-        }
-    }
-
-    /// True when on-open data is stale enough to justify a fetch.
-    private func shouldRefreshOnOpen() -> Bool {
-        guard let snapshot else { return true }
-        return now().timeIntervalSince(snapshot.fetchedAt) > preferences.refreshInterval.seconds
-    }
-
-    /// Re-applies the poll interval after a preference change. The interval is
-    /// always the configured value — panel visibility no longer tightens it.
+    /// Re-applies the poll interval after a preference change.
     func rescheduleTimer() {
         timer?.invalidate()
         let interval = preferences.refreshInterval.seconds
@@ -176,41 +143,86 @@ final class UsageStore: ObservableObject {
 
     // MARK: - Private
 
-    private func apply(_ fresh: UsageSnapshot) {
-        snapshot = fresh
-        cache.save(fresh)
-        lastSuccess = now()
-        backoffUntil = nil
-        consecutiveRateLimits = 0
-        state = .ok
+    /// Refreshes one provider, mapping success/failure onto its `ProviderUsage`.
+    private func refresh(_ provider: UsageProvider, ignoringBackoff: Bool) async {
+        let id = provider.id
+        if !ignoringBackoff, let until = backoffUntil[id], now() < until { return }
+
+        if usageByID[id] == nil {
+            usageByID[id] = ProviderUsage(id: id, displayName: provider.displayName,
+                                          state: .loading, snapshot: nil)
+        }
+        do {
+            apply(try await provider.fetchUsage(), for: id, displayName: provider.displayName)
+        } catch ProviderError.unauthorized {
+            setState(.error(.loginExpired), for: id)
+        } catch ProviderError.network {
+            degrade(to: .network, for: id)
+        } catch ProviderError.badResponse {
+            degrade(to: .badResponse, for: id)
+        } catch ProviderError.rateLimited(let retryAfter) {
+            applyRateLimitBackoff(retryAfter: retryAfter, for: id)
+        } catch CredentialError.notFound, CredentialError.malformed {
+            setState(.error(.claudeCodeNotFound), for: id)
+        } catch CredentialError.accessDenied {
+            setState(.error(.keychainAccessDenied), for: id)
+        } catch {
+            degrade(to: .badResponse, for: id)
+        }
     }
 
-    /// Pauses polling after a 429: honors `Retry-After`, else backs off
-    /// exponentially (2m, 5m, 15m). The cached snapshot stays shown as stale.
-    private func applyRateLimitBackoff(retryAfter: TimeInterval?) {
-        consecutiveRateLimits += 1
-        let steps: [TimeInterval] = [120, 300, 900]
-        let fallback = steps[min(consecutiveRateLimits - 1, steps.count - 1)]
-        backoffUntil = now().addingTimeInterval(retryAfter ?? fallback)
-        degrade(to: .badResponse)
+    private func apply(_ snapshot: ProviderSnapshot, for id: ProviderID, displayName: String) {
+        usageByID[id] = ProviderUsage(id: id, displayName: displayName,
+                                      state: .ok, snapshot: snapshot)
+        caches[id]?.save(snapshot)
+        lastSuccess[id] = now()
+        backoffUntil[id] = nil
+        consecutiveRateLimits[id] = 0
     }
 
-    /// A soft failure: keep showing the cached snapshot if we have one.
-    private func degrade(to kind: UsageError) {
-        if snapshot != nil {
-            state = .stale
+    private func setState(_ state: LoadState, for id: ProviderID) {
+        guard var usage = usageByID[id] else { return }
+        usage.state = state
+        usageByID[id] = usage
+    }
+
+    /// A soft failure: keep showing the cached snapshot as stale if there is
+    /// one, else surface the error.
+    private func degrade(to kind: UsageError, for id: ProviderID) {
+        if usageByID[id]?.snapshot != nil {
+            setState(.stale, for: id)
         } else {
-            state = .error(kind)
+            setState(.error(kind), for: id)
         }
     }
 
-    /// If a refresh has not succeeded in 3x the poll interval, mark the snapshot stale.
+    /// Pauses polling for one provider after a 429: honors `Retry-After`, else
+    /// backs off exponentially (2m, 5m, 15m).
+    private func applyRateLimitBackoff(retryAfter: TimeInterval?, for id: ProviderID) {
+        let count = (consecutiveRateLimits[id] ?? 0) + 1
+        consecutiveRateLimits[id] = count
+        let steps: [TimeInterval] = [120, 300, 900]
+        let fallback = steps[min(count - 1, steps.count - 1)]
+        backoffUntil[id] = now().addingTimeInterval(retryAfter ?? fallback)
+        degrade(to: .badResponse, for: id)
+    }
+
+    /// Marks a provider's snapshot stale if no refresh has succeeded in 3x the
+    /// poll interval.
     private func markStaleIfNeeded() {
-        guard state == .ok, let lastSuccess else { return }
         let threshold = preferences.refreshInterval.seconds * 3
-        if now().timeIntervalSince(lastSuccess) > threshold {
-            state = .stale
+        for (id, usage) in usageByID where usage.state == .ok {
+            if let last = lastSuccess[id], now().timeIntervalSince(last) > threshold {
+                setState(.stale, for: id)
+            }
         }
+        publish(order: providers.map(\.id))
+    }
+
+    /// Pushes the internal per-provider map to the published `providers` array,
+    /// ordered by the given provider-id order.
+    private func publish(order: [ProviderID]) {
+        providers = order.compactMap { usageByID[$0] }
     }
 
     @objc private func systemDidWake() {
@@ -218,9 +230,6 @@ final class UsageStore: ObservableObject {
     }
 
     private func observeNetwork() {
-        // The handler runs on a background queue. It captures only `[weak self]`
-        // and hops to the main actor before touching any state, so there is no
-        // shared mutable variable crossing threads.
         pathMonitor.pathUpdateHandler = { [weak self] path in
             let satisfied = path.status == .satisfied
             Task { @MainActor in

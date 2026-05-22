@@ -51,4 +51,27 @@ final class PreferencesTests: XCTestCase {
         XCTAssertNil(RefreshInterval(rawValue: 30))
         XCTAssertEqual(RefreshInterval.allCases, [.s60, .s120])
     }
+
+    @MainActor
+    func testMenuBarProviderIDDefaultsToClaude() {
+        let prefs = Preferences(defaults: freshDefaults())
+        XCTAssertEqual(prefs.menuBarProviderID, .claude)
+    }
+
+    @MainActor
+    func testMenuBarProviderIDWritesRawValueToDefaults() {
+        let defaults = freshDefaults()
+        let prefs = Preferences(defaults: defaults)
+        prefs.menuBarProviderID = .claude
+        XCTAssertEqual(defaults.string(forKey: "menuBarProviderID"), "claude",
+                       "didSet persists the raw value to UserDefaults")
+    }
+
+    @MainActor
+    func testMenuBarProviderIDFallsBackForUnknownStoredValue() {
+        let defaults = freshDefaults()
+        defaults.set("nonsense", forKey: "menuBarProviderID")
+        XCTAssertEqual(Preferences(defaults: defaults).menuBarProviderID, .claude,
+                       "an unrecognized stored value falls back to .claude")
+    }
 }

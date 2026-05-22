@@ -7,12 +7,16 @@ final class SnapshotCacheTests: XCTestCase {
             .appendingPathComponent("cache-\(UUID().uuidString).json")
     }
 
-    private let sample = UsageSnapshot(
-        session: UsageWindow(percent: 30, resetsAt: nil),
-        weekly: UsageWindow(percent: 60, resetsAt: nil),
-        modelWeeklies: [],
-        fetchedAt: Date(timeIntervalSince1970: 555)
-    )
+    private let sample = ProviderSnapshot(
+        id: .claude,
+        plan: "Max",
+        headline: LabeledWindow(label: "Session · 5h", detail: "5-hour window",
+                                resetStyle: .countdown,
+                                window: UsageWindow(percent: 30, resetsAt: nil)),
+        windows: [LabeledWindow(label: "Session · 5h", detail: "5-hour window",
+                                resetStyle: .countdown,
+                                window: UsageWindow(percent: 30, resetsAt: nil))],
+        fetchedAt: Date(timeIntervalSince1970: 555))
 
     func testLoadReturnsNilWhenAbsent() {
         let cache = SnapshotCache(fileURL: tempURL())
@@ -32,5 +36,10 @@ final class SnapshotCacheTests: XCTestCase {
         defer { try? FileManager.default.removeItem(at: url) }
         try Data("corrupt".utf8).write(to: url)
         XCTAssertNil(SnapshotCache(fileURL: url).load())
+    }
+
+    func testDefaultURLIsPerProvider() {
+        let claude = SnapshotCache.defaultURL(for: .claude)
+        XCTAssertEqual(claude.lastPathComponent, "snapshot-claude.json")
     }
 }
