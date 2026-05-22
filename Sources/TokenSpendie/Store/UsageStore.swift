@@ -25,9 +25,8 @@ final class UsageStore: ObservableObject {
     private let now: () -> Date
 
     private var timer: Timer?
-    /// The display surfaces currently open. The poll interval tightens while any
-    /// surface is visible, so visibility is tracked per source — closing one
-    /// surface must not slow polling while another is still open.
+    /// The display surfaces currently open. Used to decide whether to refresh
+    /// when a panel opens; the poll interval itself no longer depends on it.
     private var visiblePanels: Set<PanelSource> = []
     private var panelVisible: Bool { !visiblePanels.isEmpty }
     private var lastSuccess: Date?
@@ -42,7 +41,6 @@ final class UsageStore: ObservableObject {
     /// Last known network reachability, used to detect reconnect transitions.
     /// Main-actor isolated — only touched inside the `@MainActor` task below.
     private var networkWasSatisfied = true
-    private static let panelOpenInterval: TimeInterval = 20
 
     init(provider: UsageProvider,
          credentials: CredentialStore,
@@ -142,14 +140,12 @@ final class UsageStore: ObservableObject {
         return backoffUntil
     }
 
-    /// Call when a display surface opens or closes; the poll interval tightens
-    /// while any surface is open. Tracked per source so closing one surface does
-    /// not slow polling while another is still visible. Idempotent per source.
+    /// Call when a display surface opens or closes. Tracked per source; opening
+    /// a surface triggers a refresh when the data is stale. Idempotent per source.
     func setPanelVisible(_ visible: Bool, source: PanelSource) {
         let wasVisible = panelVisible
         if visible { visiblePanels.insert(source) } else { visiblePanels.remove(source) }
         guard panelVisible != wasVisible else { return }
-        rescheduleTimer()
         // Refresh on open only when the data is stale-ish, so opening and
         // closing the panel repeatedly does not spam the endpoint.
         if panelVisible, shouldRefreshOnOpen() {
@@ -160,13 +156,14 @@ final class UsageStore: ObservableObject {
     /// True when on-open data is stale enough to justify a fetch.
     private func shouldRefreshOnOpen() -> Bool {
         guard let snapshot else { return true }
-        return now().timeIntervalSince(snapshot.fetchedAt) > 30
+        return now().timeIntervalSince(snapshot.fetchedAt) > preferences.refreshInterval.seconds
     }
 
-    /// Re-applies the poll interval after a preference change.
+    /// Re-applies the poll interval after a preference change. The interval is
+    /// always the configured value — panel visibility no longer tightens it.
     func rescheduleTimer() {
         timer?.invalidate()
-        let interval = panelVisible ? Self.panelOpenInterval : preferences.refreshInterval.seconds
+        let interval = preferences.refreshInterval.seconds
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.markStaleIfNeeded()

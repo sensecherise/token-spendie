@@ -16,9 +16,9 @@ enum CredentialMode: String, CaseIterable, Identifiable {
     }
 }
 
-/// How often the widget polls when no panel is open.
+/// How often the widget polls. 60 seconds is the floor — the usage endpoint
+/// rate-limits aggressively, so faster polling is not offered.
 enum RefreshInterval: Int, CaseIterable, Identifiable {
-    case s30 = 30
     case s60 = 60
     case s120 = 120
 
@@ -26,7 +26,6 @@ enum RefreshInterval: Int, CaseIterable, Identifiable {
     var seconds: TimeInterval { TimeInterval(rawValue) }
     var label: String {
         switch self {
-        case .s30: return "30 seconds"
         case .s60: return "60 seconds"
         case .s120: return "2 minutes"
         }
