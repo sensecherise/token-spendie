@@ -172,7 +172,7 @@ private struct RefreshIndicator: View {
             HStack(spacing: 0) {
                 Text("fetching")
                 Text(String(repeating: ".", count: FetchingEllipsis.dotCount(at: context.date)))
-                    .frame(width: 10, alignment: .leading)
+                    .frame(width: 12, alignment: .leading)
             }
             .font(.system(size: 9))
             .foregroundStyle(.secondary)
