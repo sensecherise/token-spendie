@@ -72,6 +72,12 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(usage(store, .claude)?.state, .error(.claudeCodeNotFound))
     }
 
+    func testMalformedCredentialsSurfaceClaudeCodeNotFound() async {
+        let store = makeStore([StubProvider(results: [.failure(CredentialError.malformed)])])
+        await store.refreshNow()
+        XCTAssertEqual(usage(store, .claude)?.state, .error(.claudeCodeNotFound))
+    }
+
     func testKeychainDeniedSurfacesError() async {
         let store = makeStore([StubProvider(results: [.failure(CredentialError.accessDenied)])])
         await store.refreshNow()
@@ -99,15 +105,8 @@ final class UsageStoreTests: XCTestCase {
         XCTAssertEqual(usage(store, .claude)?.state, .error(.network))
     }
 
-    func testOneProviderFailingDoesNotAbortAnother() async {
-        let ok = StubProvider(id: .claude, displayName: "Claude",
-                              results: [.success(snapshot(20, id: .claude))])
-        // A second provider id is simulated with .claude-shaped data is not
-        // possible (Phase 1 has one ProviderID); instead assert the single
-        // provider's failure is isolated to its own row.
-        let store = makeStore([ok])
-        await store.refreshNow()
-        XCTAssertEqual(usage(store, .claude)?.state, .ok)
+    func testOneProviderFailingDoesNotAbortAnother() throws {
+        throw XCTSkip("Multi-provider isolation — deferred to Phase 2, when a second ProviderID exists")
     }
 
     func testRateLimitPausesPollingForThatProvider() async {

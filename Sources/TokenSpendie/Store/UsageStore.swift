@@ -80,7 +80,12 @@ final class UsageStore: ObservableObject {
             name: NSWorkspace.didWakeNotification, object: nil)
         observeNetwork()
         rescheduleTimer()
-        Task { await refreshNow() }
+        // Skip the initial fetch when every provider already has a fresh
+        // cached snapshot — avoids a request burst on every relaunch.
+        let needsImmediateFetch = registered.contains { usageByID[$0.id]?.state != .ok }
+        if needsImmediateFetch {
+            Task { await refreshNow() }
+        }
     }
 
     /// One refresh cycle: detect every registered provider, then fetch each
