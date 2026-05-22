@@ -216,18 +216,14 @@ struct DetailPanelView: View {
     private func messageView(for kind: UsageError) -> some View {
         let (icon, text): (String, String) = {
             switch kind {
-            case .claudeCodeNotFound:
-                return ("🔌", "Claude Code not found. Install and log in to Claude Code, then this widget picks up your usage automatically.")
-            case .keychainAccessDenied:
-                return ("🔑", "Keychain access needed. The widget reads your Claude login token from the Keychain — click refresh and choose Allow.")
-            case .loginExpired:
-                return ("⏱", "Login expired. Run any Claude Code command to refresh your session — the widget recovers on its own after that.")
+            case .noToken:
+                return ("🔑", "No API token. Open Settings and paste a token from `claude setup-token`.")
+            case .tokenInvalid:
+                return ("⏱", "Token invalid or expired. Open Settings and paste a fresh token from `claude setup-token`.")
             case .network:
                 return ("📡", "Can't reach the usage service. The widget will keep retrying.")
             case .badResponse:
                 return ("⚠️", "Couldn't read usage data. The usage source returned something unexpected — the widget will keep retrying.")
-            case .noManualToken:
-                return ("🔑", "No token saved. Open Settings, choose Manual, and paste a token from `claude setup-token`.")
             }
         }()
         return HStack(alignment: .top, spacing: 8) {

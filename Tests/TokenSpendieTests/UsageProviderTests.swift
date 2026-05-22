@@ -19,6 +19,16 @@ final class UsageProviderTests: XCTestCase {
         XCTAssertEqual(snapshot.fetchedAt, Date(timeIntervalSince1970: 42))
     }
 
+    func testEndpointProviderEmptyTokenThrowsUnauthorizedWithoutCallingTransport() async {
+        var transportCalled = false
+        let provider = EndpointUsageProvider(transport: { _ in
+            transportCalled = true
+            return (Data(), self.http(200))
+        })
+        await assertThrows(provider, .unauthorized, accessToken: "")
+        XCTAssertFalse(transportCalled, "transport must not be invoked for an empty token")
+    }
+
     func testEndpointProvider401ThrowsUnauthorized() async {
         let provider = EndpointUsageProvider(transport: { _ in (Data(), self.http(401)) })
         await assertThrows(provider, .unauthorized)
@@ -42,9 +52,10 @@ final class UsageProviderTests: XCTestCase {
     }
 
     private func assertThrows(_ provider: UsageProvider, _ expected: ProviderError,
+                              accessToken: String = "tok",
                               file: StaticString = #filePath, line: UInt = #line) async {
         do {
-            _ = try await provider.fetchUsage(accessToken: "tok")
+            _ = try await provider.fetchUsage(accessToken: accessToken)
             XCTFail("expected \(expected)", file: file, line: line)
         } catch {
             XCTAssertEqual(error as? ProviderError, expected, file: file, line: line)

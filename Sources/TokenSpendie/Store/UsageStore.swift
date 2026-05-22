@@ -19,15 +19,14 @@ final class UsageStore: ObservableObject {
     @Published private(set) var isRefreshing = false
 
     private let provider: UsageProvider
-    private let credentials: CredentialStore
+    private let tokenStore: TokenStore
     private let cache: SnapshotCache
     private let preferences: Preferences
     private let now: () -> Date
 
     private var timer: Timer?
-    /// The display surfaces currently open. The poll interval tightens while any
-    /// surface is visible, so visibility is tracked per source — closing one
-    /// surface must not slow polling while another is still open.
+    /// The display surfaces currently open. Used to decide whether to refresh
+    /// when a panel opens; the poll interval itself no longer depends on it.
     private var visiblePanels: Set<PanelSource> = []
     private var panelVisible: Bool { !visiblePanels.isEmpty }
     private var lastSuccess: Date?
@@ -42,15 +41,14 @@ final class UsageStore: ObservableObject {
     /// Last known network reachability, used to detect reconnect transitions.
     /// Main-actor isolated — only touched inside the `@MainActor` task below.
     private var networkWasSatisfied = true
-    private static let panelOpenInterval: TimeInterval = 20
 
     init(provider: UsageProvider,
-         credentials: CredentialStore,
+         tokenStore: TokenStore,
          cache: SnapshotCache,
          preferences: Preferences,
          now: @escaping () -> Date = Date.init) {
         self.provider = provider
-        self.credentials = credentials
+        self.tokenStore = tokenStore
         self.cache = cache
         self.preferences = preferences
         self.now = now
@@ -79,35 +77,30 @@ final class UsageStore: ObservableObject {
         }
     }
 
-    /// Performs one refresh cycle: load credentials, fetch, retry once on 401.
+    /// Performs one refresh cycle. Returns immediately — making no request —
+    /// when no token is configured; this is what prevents an empty bearer from
+    /// reaching the endpoint and coming back as a mislabeled 429.
     /// `ignoringBackoff` lets a user-initiated refresh proceed during 429
     /// backoff; automatic callers leave it `false` so polling stays paused.
     func refreshNow(ignoringBackoff: Bool = false) async {
         if !ignoringBackoff, let backoffUntil, now() < backoffUntil { return }
         isRefreshing = true
         defer { isRefreshing = false }
+        guard let token = tokenStore.token else {
+            state = .error(.noToken)
+            return
+        }
         if snapshot == nil { state = .loading }
         do {
-            let creds = try credentials.loadCredentials()
-            do {
-                apply(try await provider.fetchUsage(accessToken: creds.accessToken))
-            } catch ProviderError.unauthorized {
-                // Re-read the Keychain once — Claude Code refreshes the token during normal use.
-                let refreshed = try credentials.loadCredentials()
-                apply(try await provider.fetchUsage(accessToken: refreshed.accessToken))
-            }
+            apply(try await provider.fetchUsage(accessToken: token))
         } catch ProviderError.unauthorized {
-            state = .error(.loginExpired)
+            state = .error(.tokenInvalid)
         } catch ProviderError.network {
             degrade(to: .network)
         } catch ProviderError.badResponse {
             degrade(to: .badResponse)
         } catch ProviderError.rateLimited(let retryAfter) {
             applyRateLimitBackoff(retryAfter: retryAfter)
-        } catch CredentialError.notFound, CredentialError.malformed {
-            state = .error(preferences.credentialMode == .manual ? .noManualToken : .claudeCodeNotFound)
-        } catch CredentialError.accessDenied {
-            state = .error(.keychainAccessDenied)
         } catch {
             degrade(to: .badResponse)
         }
@@ -142,14 +135,12 @@ final class UsageStore: ObservableObject {
         return backoffUntil
     }
 
-    /// Call when a display surface opens or closes; the poll interval tightens
-    /// while any surface is open. Tracked per source so closing one surface does
-    /// not slow polling while another is still visible. Idempotent per source.
+    /// Call when a display surface opens or closes. Tracked per source; opening
+    /// a surface triggers a refresh when the data is stale. Idempotent per source.
     func setPanelVisible(_ visible: Bool, source: PanelSource) {
         let wasVisible = panelVisible
         if visible { visiblePanels.insert(source) } else { visiblePanels.remove(source) }
         guard panelVisible != wasVisible else { return }
-        rescheduleTimer()
         // Refresh on open only when the data is stale-ish, so opening and
         // closing the panel repeatedly does not spam the endpoint.
         if panelVisible, shouldRefreshOnOpen() {
@@ -160,13 +151,14 @@ final class UsageStore: ObservableObject {
     /// True when on-open data is stale enough to justify a fetch.
     private func shouldRefreshOnOpen() -> Bool {
         guard let snapshot else { return true }
-        return now().timeIntervalSince(snapshot.fetchedAt) > 30
+        return now().timeIntervalSince(snapshot.fetchedAt) > preferences.refreshInterval.seconds
     }
 
-    /// Re-applies the poll interval after a preference change.
+    /// Re-applies the poll interval after a preference change. The interval is
+    /// always the configured value — panel visibility no longer tightens it.
     func rescheduleTimer() {
         timer?.invalidate()
-        let interval = panelVisible ? Self.panelOpenInterval : preferences.refreshInterval.seconds
+        let interval = preferences.refreshInterval.seconds
         let timer = Timer(timeInterval: interval, repeats: true) { [weak self] _ in
             Task { @MainActor in
                 self?.markStaleIfNeeded()

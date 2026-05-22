@@ -24,12 +24,10 @@ struct UsageSnapshot: Codable, Equatable {
 
 /// A user-facing failure. Each maps to a distinct widget state.
 enum UsageError: Error, Equatable {
-    case claudeCodeNotFound     // no Keychain item
-    case keychainAccessDenied   // user denied Keychain access
-    case loginExpired           // 401 even after re-reading the Keychain
+    case noToken                // no API token entered
+    case tokenInvalid           // HTTP 401 — token invalid or expired
     case network                // offline / unreachable
     case badResponse            // non-200 or unparseable payload
-    case noManualToken          // manual mode selected but no token saved
 }
 
 /// What the data layer's provider/decoder can throw.

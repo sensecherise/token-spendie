@@ -4,8 +4,7 @@ import Combine
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var preferences: Preferences!
-    private var manualTokenStore: ManualTokenStore!
-    private var credentialRouter: CredentialRouter!
+    private var tokenStore: TokenStore!
     private var store: UsageStore!
     private var menuBar: MenuBarController!
     private var floatingPanel: FloatingPanelController!
@@ -15,15 +14,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @MainActor
     func applicationDidFinishLaunching(_ notification: Notification) {
         preferences = Preferences()
-        manualTokenStore = ManualTokenStore()
-        credentialRouter = CredentialRouter(
-            mode: preferences.credentialMode,
-            keychain: KeychainReader(),
-            manual: manualTokenStore
-        )
+        tokenStore = TokenStore()
         store = UsageStore(
             provider: EndpointUsageProvider(),
-            credentials: credentialRouter,
+            tokenStore: tokenStore,
             cache: SnapshotCache(fileURL: SnapshotCache.defaultURL()),
             preferences: preferences
         )
@@ -42,13 +36,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         preferences.objectWillChange
             .receive(on: RunLoop.main)
             .sink { [weak self] in
-                guard let self else { return }
-                self.applyDisplayPreferences()
-                let newMode = self.preferences.credentialMode
-                if self.credentialRouter.mode != newMode {
-                    self.credentialRouter.mode = newMode
-                    Task { await self.store.refreshNow() }
-                }
+                self?.applyDisplayPreferences()
             }
             .store(in: &cancellables)
     }
@@ -88,9 +76,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         let view = PreferencesView(
             preferences: preferences,
-            manualTokenStore: manualTokenStore,
+            tokenStore: tokenStore,
             onDisplayChanged: { [weak self] in self?.applyDisplayPreferences() },
-            onIntervalChanged: { [weak self] in self?.store.rescheduleTimer() }
+            onIntervalChanged: { [weak self] in self?.store.rescheduleTimer() },
+            onTokenChanged: { [weak self] in
+                guard let self else { return }
+                Task { await self.store.refreshNow() }
+            }
         )
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 300, height: 320),

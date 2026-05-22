@@ -13,6 +13,9 @@ struct EndpointUsageProvider: UsageProvider {
     }
 
     func fetchUsage(accessToken: String) async throws -> UsageSnapshot {
+        // The endpoint returns 429 (not 401) for a missing/empty bearer, which
+        // would be mislabeled as a rate limit. Never send an empty token.
+        guard !accessToken.isEmpty else { throw ProviderError.unauthorized }
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")

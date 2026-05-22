@@ -4,15 +4,6 @@ import XCTest
 @MainActor
 final class UsageStoreTests: XCTestCase {
     // --- Test doubles ---
-    final class StubCredentials: CredentialStore {
-        var result: Result<OAuthCredentials, Error>
-        var loadCount = 0
-        init(_ result: Result<OAuthCredentials, Error>) { self.result = result }
-        func loadCredentials() throws -> OAuthCredentials {
-            loadCount += 1
-            return try result.get()
-        }
-    }
     final class StubProvider: UsageProvider {
         var results: [Result<UsageSnapshot, Error>]
         var callCount = 0
@@ -22,7 +13,7 @@ final class UsageStoreTests: XCTestCase {
             return try results[min(callCount, results.count - 1)].get()
         }
     }
-    /// A provider that runs a probe closure at the moment `fetchUsage` is called,
+    /// A provider that runs a probe closure when `fetchUsage` is called,
     /// for observing store state mid-refresh.
     final class ProbeProvider: UsageProvider {
         var onFetch: () -> Void = {}
@@ -34,68 +25,66 @@ final class UsageStoreTests: XCTestCase {
         }
     }
 
-    private func creds() -> OAuthCredentials {
-        OAuthCredentials(accessToken: "tok", refreshToken: nil, expiresAt: nil)
-    }
     private func snapshot(_ percent: Double, at: TimeInterval = 0) -> UsageSnapshot {
         UsageSnapshot(session: UsageWindow(percent: percent, resetsAt: nil),
                       weekly: UsageWindow(percent: percent, resetsAt: nil),
                       modelWeeklies: [], fetchedAt: Date(timeIntervalSince1970: at))
     }
-    private func makeStore(credentials: CredentialStore, provider: UsageProvider,
+
+    /// A `TokenStore` backed by a throwaway UserDefaults suite. Pass `token: nil`
+    /// for the no-token case.
+    private func tokenStore(token: String? = "tok") -> TokenStore {
+        let store = TokenStore(defaults: UserDefaults(suiteName: "UsageStoreTests-\(UUID().uuidString)")!)
+        if let token { try? store.save(token) }
+        return store
+    }
+
+    private func makeStore(tokenStore: TokenStore, provider: UsageProvider,
                            now: @escaping () -> Date = { Date(timeIntervalSince1970: 0) }) -> UsageStore {
         let url = FileManager.default.temporaryDirectory
             .appendingPathComponent("store-\(UUID().uuidString).json")
         return UsageStore(provider: provider,
-                          credentials: credentials,
+                          tokenStore: tokenStore,
                           cache: SnapshotCache(fileURL: url),
                           preferences: Preferences(defaults: UserDefaults(suiteName: UUID().uuidString)!),
                           now: now)
     }
 
     func testSuccessfulRefreshPublishesSnapshotAndOk() async {
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
+        let store = makeStore(tokenStore: tokenStore(),
                               provider: StubProvider([.success(snapshot(42))]))
         await store.refreshNow()
         XCTAssertEqual(store.snapshot?.session.percent, 42)
         XCTAssertEqual(store.state, .ok)
     }
 
-    func testMissingKeychainSurfacesClaudeCodeNotFound() async {
-        let store = makeStore(credentials: StubCredentials(.failure(CredentialError.notFound)),
-                              provider: StubProvider([.success(snapshot(1))]))
+    func testNoTokenSurfacesNoTokenAndMakesNoRequest() async {
+        let provider = StubProvider([.success(snapshot(1))])
+        let store = makeStore(tokenStore: tokenStore(token: nil), provider: provider)
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.claudeCodeNotFound))
+        XCTAssertEqual(store.state, .error(.noToken))
+        XCTAssertEqual(provider.callCount, 0, "no request is made without a token")
     }
 
-    func testKeychainDeniedSurfacesError() async {
-        let store = makeStore(credentials: StubCredentials(.failure(CredentialError.accessDenied)),
-                              provider: StubProvider([.success(snapshot(1))]))
+    func testUnauthorizedSurfacesTokenInvalid() async {
+        let store = makeStore(tokenStore: tokenStore(),
+                              provider: StubProvider([.failure(ProviderError.unauthorized)]))
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.keychainAccessDenied))
+        XCTAssertEqual(store.state, .error(.tokenInvalid))
     }
 
-    func testUnauthorizedRetriesByRereadingKeychain() async {
-        let credentials = StubCredentials(.success(creds()))
-        let provider = StubProvider([.failure(ProviderError.unauthorized), .success(snapshot(55))])
-        let store = makeStore(credentials: credentials, provider: provider)
-        await store.refreshNow()
-        XCTAssertEqual(store.state, .ok)
-        XCTAssertEqual(store.snapshot?.session.percent, 55)
-        XCTAssertEqual(credentials.loadCount, 2, "should re-read the Keychain once on 401")
-    }
-
-    func testPersistentUnauthorizedSurfacesLoginExpired() async {
+    func testUnauthorizedDoesNotRetry() async {
         let provider = StubProvider([.failure(ProviderError.unauthorized),
-                                     .failure(ProviderError.unauthorized)])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider)
+                                     .success(snapshot(55))])
+        let store = makeStore(tokenStore: tokenStore(), provider: provider)
         await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.loginExpired))
+        XCTAssertEqual(store.state, .error(.tokenInvalid))
+        XCTAssertEqual(provider.callCount, 1, "a 401 is not retried")
     }
 
     func testNetworkFailureWithCachedSnapshotGoesStale() async {
         let provider = StubProvider([.success(snapshot(30)), .failure(ProviderError.network)])
-        let store = makeStore(credentials: StubCredentials(.success(creds())), provider: provider)
+        let store = makeStore(tokenStore: tokenStore(), provider: provider)
         await store.refreshNow()   // succeeds
         await store.refreshNow()   // fails
         XCTAssertEqual(store.state, .stale)
@@ -103,34 +92,16 @@ final class UsageStoreTests: XCTestCase {
     }
 
     func testNetworkFailureWithNoSnapshotSurfacesError() async {
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
+        let store = makeStore(tokenStore: tokenStore(),
                               provider: StubProvider([.failure(ProviderError.network)]))
         await store.refreshNow()
         XCTAssertEqual(store.state, .error(.network))
     }
 
-    func testManualModeMissingTokenSurfacesNoManualToken() async {
-        let prefsDefaults = UserDefaults(suiteName: UUID().uuidString)!
-        let preferences = Preferences(defaults: prefsDefaults)
-        preferences.credentialMode = .manual
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("store-\(UUID().uuidString).json")
-        let store = UsageStore(
-            provider: StubProvider([.success(snapshot(1))]),
-            credentials: StubCredentials(.failure(CredentialError.notFound)),
-            cache: SnapshotCache(fileURL: url),
-            preferences: preferences,
-            now: { Date(timeIntervalSince1970: 0) }
-        )
-        await store.refreshNow()
-        XCTAssertEqual(store.state, .error(.noManualToken))
-    }
-
     func testRateLimitPausesPolling() async {
         let provider = StubProvider([.success(snapshot(30)),
                                      .failure(ProviderError.rateLimited(retryAfter: 600))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: provider,
+        let store = makeStore(tokenStore: tokenStore(), provider: provider,
                               now: { Date(timeIntervalSince1970: 0) })
         await store.refreshNow()   // success — snapshot cached
         await store.refreshNow()   // 429 — backoff begins
@@ -142,8 +113,7 @@ final class UsageStoreTests: XCTestCase {
 
     func testIsRefreshingTrueDuringFetchAndFalseAfter() async {
         let provider = ProbeProvider(.success(snapshot(20)))
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: provider)
+        let store = makeStore(tokenStore: tokenStore(), provider: provider)
         var observedDuringFetch = false
         provider.onFetch = { observedDuringFetch = store.isRefreshing }
         XCTAssertFalse(store.isRefreshing, "idle before any refresh")
@@ -153,17 +123,23 @@ final class UsageStoreTests: XCTestCase {
     }
 
     func testIsRefreshingClearsWhenFetchThrows() async {
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
+        let store = makeStore(tokenStore: tokenStore(),
                               provider: StubProvider([.failure(ProviderError.network)]))
         await store.refreshNow()
         XCTAssertFalse(store.isRefreshing, "isRefreshing clears even when the fetch fails")
     }
 
+    func testIsRefreshingClearsOnNoTokenEarlyReturn() async {
+        let store = makeStore(tokenStore: tokenStore(token: nil),
+                              provider: StubProvider([.success(snapshot(1))]))
+        await store.refreshNow()
+        XCTAssertFalse(store.isRefreshing, "isRefreshing clears on the no-token early return")
+    }
+
     func testManualRefreshIgnoresRapidRepeatCalls() async {
         var clock = Date(timeIntervalSince1970: 0)
         let provider = StubProvider([.success(snapshot(10)), .success(snapshot(10))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: provider, now: { clock })
+        let store = makeStore(tokenStore: tokenStore(), provider: provider, now: { clock })
         await store.manualRefresh()                       // fires
         await store.manualRefresh()                       // within 2s gap — skipped
         XCTAssertEqual(provider.callCount, 1, "a second manual refresh within 2s is ignored")
@@ -177,8 +153,7 @@ final class UsageStoreTests: XCTestCase {
         let provider = StubProvider([.success(snapshot(30)),
                                      .failure(ProviderError.rateLimited(retryAfter: 600)),
                                      .success(snapshot(45))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: provider, now: { clock })
+        let store = makeStore(tokenStore: tokenStore(), provider: provider, now: { clock })
         await store.manualRefresh()                       // success
         clock = Date(timeIntervalSince1970: 3)
         await store.manualRefresh()                       // 429 — backoff begins
@@ -197,8 +172,7 @@ final class UsageStoreTests: XCTestCase {
         var clock = Date(timeIntervalSince1970: 0)
         let provider = StubProvider([.success(snapshot(30)),
                                      .failure(ProviderError.rateLimited(retryAfter: 600))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: provider, now: { clock })
+        let store = makeStore(tokenStore: tokenStore(), provider: provider, now: { clock })
         await store.refreshNow()                          // success
         clock = Date(timeIntervalSince1970: 3)
         await store.refreshNow()                          // 429 — backoff begins
@@ -214,8 +188,7 @@ final class UsageStoreTests: XCTestCase {
         let provider = StubProvider([.success(snapshot(30)),
                                      .failure(ProviderError.rateLimited(retryAfter: 600)),
                                      .success(snapshot(40))])
-        let store = makeStore(credentials: StubCredentials(.success(creds())),
-                              provider: provider, now: { clock })
+        let store = makeStore(tokenStore: tokenStore(), provider: provider, now: { clock })
         await store.refreshNow()
         XCTAssertNil(store.rateLimitedUntil, "not rate limited after a success")
         clock = Date(timeIntervalSince1970: 1)

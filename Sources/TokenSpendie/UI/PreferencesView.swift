@@ -26,13 +26,14 @@ enum LoginItem {
 
 struct PreferencesView: View {
     @ObservedObject var preferences: Preferences
-    let manualTokenStore: ManualTokenStore
+    let tokenStore: TokenStore
     @State private var draftToken: String = ""
     @State private var tokenSaved: Bool = false
     @State private var verifyState: TokenVerifyState = .idle
     @State private var verifyTask: Task<Void, Never>?
     var onDisplayChanged: () -> Void
     var onIntervalChanged: () -> Void
+    var onTokenChanged: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -81,29 +82,24 @@ struct PreferencesView: View {
             }
 
             VStack(alignment: .leading, spacing: 8) {
-                Text("CREDENTIAL").font(.system(size: 10, weight: .heavy)).foregroundStyle(.secondary)
-                Picker("Source", selection: $preferences.credentialMode) {
-                    ForEach(CredentialMode.allCases) { Text($0.label).tag($0) }
-                }
-                if preferences.credentialMode == .manual {
-                    HStack(spacing: 5) {
-                        Image(systemName: tokenSaved ? "checkmark.circle.fill" : "exclamationmark.circle")
-                            .foregroundStyle(tokenSaved ? Color.green : Color.secondary)
-                        Text(tokenSaved ? "Token saved" : "No token saved")
-                            .font(.system(size: 10)).foregroundStyle(.secondary)
-                    }
-                    Text("Run `claude setup-token` in Terminal, then paste the token below.")
+                Text("API TOKEN").font(.system(size: 10, weight: .heavy)).foregroundStyle(.secondary)
+                HStack(spacing: 5) {
+                    Image(systemName: tokenSaved ? "checkmark.circle.fill" : "exclamationmark.circle")
+                        .foregroundStyle(tokenSaved ? Color.green : Color.secondary)
+                    Text(tokenSaved ? "Token saved" : "No token saved")
                         .font(.system(size: 10)).foregroundStyle(.secondary)
-                    SecureField("Paste token", text: $draftToken)
-                    HStack(spacing: 8) {
-                        Button("Save") { saveAndVerify() }
-                            .disabled(draftToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
-                                      || verifyState == .verifying)
-                        verifyIndicator
-                        Spacer()
-                        if tokenSaved {
-                            Button("Clear") { clearToken() }
-                        }
+                }
+                Text("Run `claude setup-token` in Terminal, then paste the token below.")
+                    .font(.system(size: 10)).foregroundStyle(.secondary)
+                SecureField("Paste token", text: $draftToken)
+                HStack(spacing: 8) {
+                    Button("Save") { saveAndVerify() }
+                        .disabled(draftToken.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                                  || verifyState == .verifying)
+                    verifyIndicator
+                    Spacer()
+                    if tokenSaved {
+                        Button("Clear") { clearToken() }
                     }
                 }
             }
@@ -124,7 +120,7 @@ struct PreferencesView: View {
         .frame(width: 300)
         .onAppear {
             preferences.launchAtLogin = LoginItem.isEnabled
-            tokenSaved = manualTokenStore.hasToken
+            tokenSaved = tokenStore.hasToken
         }
     }
 
@@ -159,14 +155,16 @@ struct PreferencesView: View {
 
     /// Saves the token immediately, then checks it against the usage endpoint.
     /// The token is saved regardless of the check result — a rate-limited or
-    /// unreachable endpoint must not block saving.
+    /// unreachable endpoint must not block saving. `onTokenChanged` lets the
+    /// main store pick up the new token right away.
     private func saveAndVerify() {
         let token = draftToken.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !token.isEmpty else { return }
         verifyTask?.cancel()
-        try? manualTokenStore.save(token: token)
-        tokenSaved = manualTokenStore.hasToken
+        try? tokenStore.save(token)
+        tokenSaved = tokenStore.hasToken
         draftToken = ""
+        onTokenChanged()
         verifyState = .verifying
         verifyTask = Task { @MainActor in
             do {
@@ -186,10 +184,11 @@ struct PreferencesView: View {
     /// Clears the stored token and the field.
     private func clearToken() {
         verifyTask?.cancel()
-        manualTokenStore.clear()
+        tokenStore.clear()
         draftToken = ""
         tokenSaved = false
         verifyState = .idle
+        onTokenChanged()
     }
 
     private enum Surface { case menuBar, floating }

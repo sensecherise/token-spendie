@@ -62,7 +62,7 @@ final class MenuBarController: NSObject {
     private func refreshButton() {
         guard let button = statusItem?.button else { return }
         switch store.state {
-        case .error(.claudeCodeNotFound):
+        case .error(.noToken):
             button.image = nil
             button.title = "✳ –"
         case .error:
