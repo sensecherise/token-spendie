@@ -46,3 +46,44 @@ enum LoadState: Equatable {
     case stale                  // showing a cached snapshot, last refresh failed
     case error(UsageError)      // no usable snapshot to show
 }
+
+/// Identifies an AI CLI the widget can track. Phase 2 adds `.gemini`.
+enum ProviderID: String, Codable, CaseIterable, Equatable {
+    case claude
+}
+
+/// How a window's `resetsAt` is rendered in the panel.
+enum ResetStyle: String, Codable, Equatable {
+    case countdown   // "resets in 2h 10m" — short rolling windows
+    case date        // "resets Mon, May 25" — weekly windows
+}
+
+/// One usage window plus the text the panel needs to render it. `label` is the
+/// row title; `detail` is the static prefix of the reset line (the live
+/// countdown/date is appended at render time so it stays current).
+struct LabeledWindow: Codable, Equatable {
+    let label: String
+    let detail: String
+    let resetStyle: ResetStyle
+    let window: UsageWindow
+}
+
+/// One complete reading of a provider's usage, normalized for the panel.
+/// `windows` is the full native list and includes the `headline` window.
+struct ProviderSnapshot: Codable, Equatable {
+    let id: ProviderID
+    let plan: String?               // best-effort; nil hides the plan pill
+    let headline: LabeledWindow     // drives the ring + collapsed-row %
+    let windows: [LabeledWindow]
+    let fetchedAt: Date
+}
+
+/// One panel row's complete state. Reuses `LoadState` as the per-provider
+/// state. `displayName` is held here so an errored/loading row can render
+/// before any snapshot exists.
+struct ProviderUsage: Equatable {
+    let id: ProviderID
+    let displayName: String
+    var state: LoadState
+    var snapshot: ProviderSnapshot?
+}
