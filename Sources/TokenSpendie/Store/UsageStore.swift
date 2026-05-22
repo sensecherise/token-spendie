@@ -3,12 +3,6 @@ import Combine
 import Network
 import AppKit
 
-/// A display surface that can hold the detail view open.
-enum PanelSource {
-    case menuBar
-    case floating
-}
-
 /// Owns polling, the data pipeline, and the published widget state.
 @MainActor
 final class UsageStore: ObservableObject {
@@ -25,10 +19,6 @@ final class UsageStore: ObservableObject {
     private let now: () -> Date
 
     private var timer: Timer?
-    /// The display surfaces currently open. Used to decide whether to refresh
-    /// when a panel opens; the poll interval itself no longer depends on it.
-    private var visiblePanels: Set<PanelSource> = []
-    private var panelVisible: Bool { !visiblePanels.isEmpty }
     private var lastSuccess: Date?
     /// While set and in the future, polling is paused — set after an HTTP 429.
     private var backoffUntil: Date?
@@ -138,25 +128,6 @@ final class UsageStore: ObservableObject {
     var rateLimitedUntil: Date? {
         guard let backoffUntil, now() < backoffUntil else { return nil }
         return backoffUntil
-    }
-
-    /// Call when a display surface opens or closes. Tracked per source; opening
-    /// a surface triggers a refresh when the data is stale. Idempotent per source.
-    func setPanelVisible(_ visible: Bool, source: PanelSource) {
-        let wasVisible = panelVisible
-        if visible { visiblePanels.insert(source) } else { visiblePanels.remove(source) }
-        guard panelVisible != wasVisible else { return }
-        // Refresh on open only when the data is stale-ish, so opening and
-        // closing the panel repeatedly does not spam the endpoint.
-        if panelVisible, shouldRefreshOnOpen() {
-            Task { await refreshNow() }
-        }
-    }
-
-    /// True when on-open data is stale enough to justify a fetch.
-    private func shouldRefreshOnOpen() -> Bool {
-        guard let snapshot else { return true }
-        return now().timeIntervalSince(snapshot.fetchedAt) > preferences.refreshInterval.seconds
     }
 
     /// Re-applies the poll interval after a preference change. The interval is

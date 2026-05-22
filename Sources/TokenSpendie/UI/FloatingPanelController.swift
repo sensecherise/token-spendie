@@ -48,13 +48,11 @@ final class FloatingPanelController {
         panel.center()
         panel.orderFrontRegardless()
         self.panel = panel
-        store.setPanelVisible(true, source: .floating)
     }
 
     /// Hides and releases the floating panel.
     func hide() {
         panel?.close()
         panel = nil
-        store.setPanelVisible(false, source: .floating)
     }
 }
