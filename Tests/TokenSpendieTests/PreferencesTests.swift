@@ -51,4 +51,16 @@ final class PreferencesTests: XCTestCase {
         XCTAssertNil(RefreshInterval(rawValue: 30))
         XCTAssertEqual(RefreshInterval.allCases, [.s60, .s120])
     }
+
+    @MainActor
+    func testMenuBarProviderIDDefaultsToClaudeAndPersists() {
+        let suite = UUID().uuidString
+        let defaults = UserDefaults(suiteName: suite)!
+        let prefs = Preferences(defaults: defaults)
+        XCTAssertEqual(prefs.menuBarProviderID, .claude, "defaults to Claude")
+
+        prefs.menuBarProviderID = .claude
+        let reloaded = Preferences(defaults: defaults)
+        XCTAssertEqual(reloaded.menuBarProviderID, .claude, "persists across instances")
+    }
 }

@@ -28,7 +28,7 @@ final class Preferences: ObservableObject {
     @Published var launchAtLogin: Bool { didSet { defaults.set(launchAtLogin, forKey: Keys.launchAtLogin) } }
     @Published var theme: Theme { didSet { defaults.set(theme.rawValue, forKey: Keys.theme) } }
     /// Which provider's ring rides the menu bar.
-    var menuBarProviderID: ProviderID {
+    @Published var menuBarProviderID: ProviderID {
         didSet { defaults.set(menuBarProviderID.rawValue, forKey: Keys.menuBarProviderID) }
     }
 
