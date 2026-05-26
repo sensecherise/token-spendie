@@ -1,12 +1,14 @@
 import AppKit
 import SwiftUI
 import Combine
+import UserNotifications
 
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var preferences: Preferences!
     private var store: UsageStore!
     private var menuBar: MenuBarController!
     private var floatingPanel: FloatingPanelController!
+    private var notifier: UsageNotifier!
     private var settingsWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
 
@@ -25,6 +27,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                                onQuit: { NSApp.terminate(nil) })
 
         applyDisplayPreferences()
+
+        // Request notification permission and start notifier.
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
+        notifier = UsageNotifier()
+        store.$snapshot
+            .compactMap { $0 }
+            .receive(on: RunLoop.main)
+            .sink { [weak self] snapshot in
+                self?.notifier.check(snapshot: snapshot)
+            }
+            .store(in: &cancellables)
+
         store.start()
 
         // React to display-preference changes made outside PreferencesView (e.g. auto re-enable).
