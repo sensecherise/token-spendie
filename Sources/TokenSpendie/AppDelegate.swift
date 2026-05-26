@@ -31,11 +31,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Request notification permission and start notifier.
         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound]) { _, _ in }
         notifier = UsageNotifier()
-        store.$snapshot
-            .compactMap { $0 }
+        store.$providers
             .receive(on: RunLoop.main)
-            .sink { [weak self] snapshot in
-                self?.notifier.check(snapshot: snapshot)
+            .sink { [weak self] providers in
+                self?.notifier.check(providers: providers)
             }
             .store(in: &cancellables)
 

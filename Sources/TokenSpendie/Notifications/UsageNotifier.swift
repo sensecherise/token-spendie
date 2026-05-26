@@ -88,18 +88,22 @@ final class UsageNotifier {
 
     // MARK: - Public
 
-    func check(snapshot: UsageSnapshot) {
-        checkWindow(snapshot.session,
-                    key: "session",
-                    jokes: Self.sessionJokes)
-        checkWindow(snapshot.weekly,
-                    key: "weekly",
-                    jokes: Self.weeklyJokes)
+    func check(providers: [ProviderUsage]) {
+        for usage in providers {
+            guard let snapshot = usage.snapshot else { continue }
+            let providerID = usage.id.rawValue
+            for labeled in snapshot.windows {
+                let label = labeled.label.lowercased()
+                let jokes = label.contains("session") ? Self.sessionJokes : Self.weeklyJokes
+                let key = "\(providerID).\(label)"
+                checkWindow(labeled.window, key: key, jokes: jokes, providerName: usage.displayName, windowLabel: labeled.label)
+            }
+        }
     }
 
     // MARK: - Private
 
-    private func checkWindow(_ window: UsageWindow, key: String, jokes: [Double: Joke]) {
+    private func checkWindow(_ window: UsageWindow, key: String, jokes: [Double: Joke], providerName: String, windowLabel: String) {
         var fired = firedThresholds
         var resets = lastResetDates
 
