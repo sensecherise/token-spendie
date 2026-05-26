@@ -12,6 +12,7 @@ final class MenuBarController: NSObject {
     private let store: UsageStore
     private let preferences: Preferences
     private let onOpenSettings: () -> Void
+    private let onOpenAbout: () -> Void
     private let onQuit: () -> Void
     private var statusItem: NSStatusItem?
     private var storeObserver: AnyCancellable?
@@ -20,10 +21,13 @@ final class MenuBarController: NSObject {
     private var clickMonitor: Any?
 
     init(store: UsageStore, preferences: Preferences,
-         onOpenSettings: @escaping () -> Void, onQuit: @escaping () -> Void) {
+         onOpenSettings: @escaping () -> Void,
+         onOpenAbout: @escaping () -> Void,
+         onQuit: @escaping () -> Void) {
         self.store = store
         self.preferences = preferences
         self.onOpenSettings = onOpenSettings
+        self.onOpenAbout = onOpenAbout
         self.onQuit = onQuit
         super.init()
     }
@@ -130,6 +134,10 @@ final class MenuBarController: NSObject {
             onOpenSettings: { [weak self] in
                 self?.closePanel()
                 self?.onOpenSettings()
+            },
+            onOpenAbout: { [weak self] in
+                self?.closePanel()
+                self?.onOpenAbout()
             },
             onQuit: { [weak self] in
                 self?.closePanel()
