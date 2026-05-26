@@ -50,7 +50,50 @@ Skipped — Candidate 1 produced a clear hit (`.credentials.json` plain file).
 
 ## U2 — Claude Code credential JSON shape
 
-<filled by Task 3>
+### Raw shape (secrets redacted)
+
+```json
+{
+  "claudeAiOauth": {
+    "accessToken": "<redacted>",
+    "refreshToken": "<redacted>",
+    "expiresAt": 1779844385628,
+    "scopes": [
+      "user:file_upload",
+      "user:inference",
+      "user:mcp_servers",
+      "user:profile",
+      "user:sessions:claude_code"
+    ],
+    "subscriptionType": "<redacted>",
+    "rateLimitTier": "<redacted>"
+  }
+}
+```
+
+### Per-field probe
+
+| Field | Type | Length / value |
+|---|---|---|
+| `accessToken` | string | 108 chars |
+| `refreshToken` | string | 108 chars |
+| `expiresAt` | Int64 | 13 digits — **milliseconds** since epoch (1779844385628 → 2026-05-30 UTC) |
+| `scopes` | string[] | 5 entries, shown above |
+| `subscriptionType` | string | 3 chars (account-tier indicator) |
+| `rateLimitTier` | string | 21 chars (rate-limit-tier indicator) |
+
+### Comparison with macOS
+
+- **Top-level key:** `claudeAiOauth` — matches mac.
+- **Core OAuth fields** (`accessToken`, `refreshToken`, `expiresAt`): present, same names, same types.
+- **`expiresAt` units:** milliseconds (13 digits). Mac parser already has a heuristic for sec-vs-ms (per spec); same heuristic works.
+- **Extra fields beyond mac shape:** `scopes`, `subscriptionType`, `rateLimitTier`. None are required to validate or refresh OAuth — they are advisory. M1 parser should tolerate unknown fields (it would anyway with a typed `OAuthCredentials` record + `JsonIgnoreCondition.WhenWritingNull` defaults).
+
+### Sanitized fixture
+
+Saved at `docs/superpowers/findings/fixtures/claude-credentials-sanitized.json`. Will seed `OAuthCredentialsParserTests` in M1.
+
+**Resolution:** JSON shape matches mac (`claudeAiOauth.{accessToken,refreshToken,expiresAt}`) with three additional non-required fields (`scopes`, `subscriptionType`, `rateLimitTier`) that the parser should ignore. `expiresAt` units are **milliseconds**.
 
 ## U3 — Gemini CLI paths
 
