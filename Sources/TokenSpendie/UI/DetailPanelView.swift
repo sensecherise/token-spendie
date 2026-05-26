@@ -350,6 +350,7 @@ struct DetailPanelView: View {
     @ObservedObject var preferences: Preferences
     var onRefresh: () -> Void
     var onOpenSettings: () -> Void
+    var onOpenAbout: () -> Void
     var onQuit: () -> Void
 
     var body: some View {
@@ -393,6 +394,7 @@ struct DetailPanelView: View {
     private var actions: some View {
         VStack(spacing: 0) {
             MenuActionRow(systemImage: "gearshape", title: "Settings…", action: onOpenSettings)
+            MenuActionRow(systemImage: "info.circle", title: "About", action: onOpenAbout)
             MenuActionRow(systemImage: "power", title: "Quit", action: onQuit)
         }
         .padding(.horizontal, 5)
