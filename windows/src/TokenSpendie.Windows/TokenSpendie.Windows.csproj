@@ -1,0 +1,7 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <RootNamespace>TokenSpendie.Windows</RootNamespace>
+    <AssemblyName>TokenSpendie.Windows</AssemblyName>
+  </PropertyGroup>
+</Project>
