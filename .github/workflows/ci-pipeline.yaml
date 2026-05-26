@@ -49,8 +49,9 @@ jobs:
           cd tap
           sed -i '' -E "s/^  version \".*\"/  version \"$VERSION\"/" Casks/token-spendie.rb
           sed -i '' -E "s/^  sha256 \".*\"/  sha256 \"$SHA\"/" Casks/token-spendie.rb
+          sed -i '' -E "s/^  version \".*\"/  version \"$VERSION\"/" Formula/token-spendie.rb
           git config user.name  "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add Casks/token-spendie.rb
+          git add Casks/token-spendie.rb Formula/token-spendie.rb
           git commit -m "token-spendie $VERSION"
           git push
