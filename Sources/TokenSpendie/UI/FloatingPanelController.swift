@@ -7,14 +7,18 @@ final class FloatingPanelController {
     private let store: UsageStore
     private let preferences: Preferences
     private let onOpenSettings: () -> Void
+    private let onOpenAbout: () -> Void
     private let onQuit: () -> Void
     private var panel: NSPanel?
 
     init(store: UsageStore, preferences: Preferences,
-         onOpenSettings: @escaping () -> Void, onQuit: @escaping () -> Void) {
+         onOpenSettings: @escaping () -> Void,
+         onOpenAbout: @escaping () -> Void,
+         onQuit: @escaping () -> Void) {
         self.store = store
         self.preferences = preferences
         self.onOpenSettings = onOpenSettings
+        self.onOpenAbout = onOpenAbout
         self.onQuit = onQuit
     }
 
@@ -42,6 +46,7 @@ final class FloatingPanelController {
                 preferences: preferences,
                 onRefresh: { [weak self] in Task { await self?.store.manualRefresh() } },
                 onOpenSettings: { [weak self] in self?.onOpenSettings() },
+                onOpenAbout: { [weak self] in self?.onOpenAbout() },
                 onQuit: { [weak self] in self?.onQuit() }
             )
         )

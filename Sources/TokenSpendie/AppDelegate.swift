@@ -10,6 +10,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var floatingPanel: FloatingPanelController!
     private var notifier: UsageNotifier!
     private var settingsWindow: NSWindow?
+    private var aboutWindow: NSWindow?
     private var cancellables = Set<AnyCancellable>()
 
     @MainActor
@@ -21,9 +22,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         menuBar = MenuBarController(store: store, preferences: preferences,
                                    onOpenSettings: { [weak self] in self?.showSettings() },
+                                   onOpenAbout: { [weak self] in self?.showAbout() },
                                    onQuit: { NSApp.terminate(nil) })
         floatingPanel = FloatingPanelController(store: store, preferences: preferences,
                                                onOpenSettings: { [weak self] in self?.showSettings() },
+                                               onOpenAbout: { [weak self] in self?.showAbout() },
                                                onQuit: { NSApp.terminate(nil) })
 
         applyDisplayPreferences()
@@ -54,6 +57,26 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private func applyDisplayPreferences() {
         if preferences.showMenuBar { menuBar.install() } else { menuBar.remove() }
         if preferences.showFloatingPanel { floatingPanel.show() } else { floatingPanel.hide() }
+    }
+
+    @MainActor
+    private func showAbout() {
+        if let aboutWindow {
+            aboutWindow.makeKeyAndOrderFront(nil)
+            NSApp.activate(ignoringOtherApps: true)
+            return
+        }
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 260, height: 220),
+            styleMask: [.titled, .closable], backing: .buffered, defer: false
+        )
+        window.title = "About Token Spendie"
+        window.contentViewController = NSHostingController(rootView: AboutView())
+        window.isReleasedWhenClosed = false
+        window.center()
+        window.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+        aboutWindow = window
     }
 
     @MainActor
