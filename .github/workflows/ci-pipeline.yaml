@@ -27,14 +27,12 @@ jobs:
           VERSION="${GITHUB_REF_NAME#v}"
           cd build
           zip -r --symlinks "TokenSpendie-$VERSION.zip" TokenSpendie.app
-          shasum -a 256 "TokenSpendie-$VERSION.zip" | awk '{print $1}' > "TokenSpendie-$VERSION.zip.sha256"
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
             build/TokenSpendie-*.zip
-            build/TokenSpendie-*.zip.sha256
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -44,7 +42,7 @@ jobs:
           TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
         run: |
           VERSION="${GITHUB_REF_NAME#v}"
-          SHA=$(cat "build/TokenSpendie-$VERSION.zip.sha256")
+          SHA=$(shasum -a 256 "build/TokenSpendie-$VERSION.zip" | awk '{print $1}')
           git clone "https://x-access-token:${TAP_TOKEN}@github.com/sensecherise/homebrew-tap.git" tap
           cd tap
           sed -i '' -E "s/^  version \".*\"/  version \"$VERSION\"/" Casks/token-spendie.rb

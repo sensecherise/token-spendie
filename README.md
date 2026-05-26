@@ -13,11 +13,24 @@ This produces `build/TokenSpendie.app` and `build/TokenSpendie.zip`.
 
 ## Install
 
-1. Unzip `TokenSpendie.zip` and move `TokenSpendie.app` to `/Applications`.
-2. **First launch:** right-click the app → **Open**, then confirm. This is
-   required once because the app is not notarized.
-3. When macOS asks for Keychain access, choose **Allow** — the widget reads your
-   Claude Code login token to fetch usage.
+### Homebrew (recommended)
+
+If Homebrew is not installed, get it from [brew.sh](https://brew.sh):
+
+    /bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+Install Token Spendie:
+
+    brew install --cask sensecherise/tap/token-spendie
+
+### Direct download
+
+1. Download `TokenSpendie-<version>.zip` from the [latest release](https://github.com/sensecherise/token-spendie/releases/latest).
+2. Unzip and drag `TokenSpendie.app` to `/Applications`.
+3. On first launch macOS may block it — open **System Settings → Privacy & Security** and click **Open Anyway**. This happens once.
+4. When macOS asks for Keychain access, choose **Allow**.
+
+> **After an update:** macOS may ask for Keychain access again on first launch. Choose **Allow** once more.
 
 ## Requirements
 
