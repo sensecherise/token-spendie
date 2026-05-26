@@ -2,6 +2,7 @@
 
 **Status:** Approved (brainstorming complete, ready for implementation plan).
 **Date:** 2026-05-26.
+**M0 spike findings:** [`docs/superpowers/findings/2026-05-26-windows-creds-spike.md`](../findings/2026-05-26-windows-creds-spike.md)
 **Scope:** Native Windows app with full feature parity to the macOS Swift app. Mac app continues to ship from `Sources/TokenSpendie/` unchanged.
 
 ---
@@ -98,7 +99,7 @@ One-to-one port of Swift modules to C# classes. Names and folder layout from §"
 | `Data/GeminiProvider` + `GeminiUsageReader` | `Data/GeminiProvider` + `Data/GeminiUsageReader` |
 | `Data/EndpointUsageProvider` | `Data/EndpointUsageProvider` |
 | `Data/UsageDecoder` | `Data/UsageDecoder` |
-| `Data/KeychainReader` | `Data/<concrete reader chosen after U1 spike>` behind `Data/ICredentialReader` |
+| `Data/KeychainReader` | `Data/ClaudeJsonFileReader` behind `Data/ICredentialReader` |
 | `Data/OAuthCredentials` | `Data/OAuthCredentials` + `Data/OAuthCredentialsParser` |
 | `Model/UsageModels.swift` | `Models/*.cs` (one record per file) |
 
@@ -108,20 +109,9 @@ Concurrency: providers are `async`; polling on `Task.Run` + `PeriodicTimer`; UI 
 
 ## Credential reading
 
-**Open unknown (must resolve in Task 0 of implementation plan):** where Claude Code stores OAuth credentials on Windows. Candidates, in expected likelihood order:
+**Storage location** (confirmed by M0 spike, [findings](../findings/2026-05-26-windows-creds-spike.md)): `%USERPROFILE%\.claude\.credentials.json` — plain JSON, same `claudeAiOauth.{accessToken,refreshToken,expiresAt}` shape as the macOS Keychain blob. Credential Manager is unused; no DPAPI wrapping. The Windows JSON adds three advisory fields (`scopes`, `subscriptionType`, `rateLimitTier`) that the parser ignores — `System.Text.Json`'s default behaviour for unknown properties is to drop them, so the mac-derived `OAuthCredentials` record needs no change.
 
-1. `%USERPROFILE%\.claude\.credentials.json` — plain JSON, same `{ "claudeAiOauth": { accessToken, refreshToken, expiresAt } }` shape as the Keychain blob. Matches Claude Code's Linux storage.
-2. Windows Credential Manager generic credential named `Claude Code-credentials`, reachable via `CredRead` (advapi32).
-3. DPAPI-encrypted file at `%LOCALAPPDATA%\AnthropicClaude\creds.dat`, decrypted with `ProtectedData.Unprotect(DataProtectionScope.CurrentUser)`.
-
-**Spike procedure** (Task 0):
-
-1. Install Claude Code on a Windows machine; run `claude /login`.
-2. Inspect `%USERPROFILE%\.claude\`, run `cmdkey /list | findstr -i claude`, run Procmon during a fresh login if neither candidate shows up.
-3. Confirm the JSON shape matches `claudeAiOauth.{accessToken,refreshToken,expiresAt}`.
-4. If a fourth location or a different JSON shape appears, update this section and the impl plan before writing the reader.
-
-**Design once spike confirms:**
+**Design:**
 
 ```csharp
 public interface ICredentialReader
@@ -474,7 +464,7 @@ claude-widget/
           EndpointUsageProvider.cs
           UsageDecoder.cs
           ICredentialReader.cs
-          <ConcreteCredentialReader>.cs   # name + impl chosen after U1 spike
+          ClaudeJsonFileReader.cs
           OAuthCredentials.cs
           OAuthCredentialsParser.cs
         Models/
@@ -549,9 +539,9 @@ JSON fixtures are copied byte-for-byte from `Tests/TokenSpendieTests/` so the pa
 
 | # | Unknown | Resolution path |
 |---|---|---|
-| U1 | Where Claude Code stores OAuth credentials on Windows | Spike in Task 0 (procedure above). |
-| U2 | Whether Claude Code on Windows uses the same `claudeAiOauth.{accessToken,refreshToken,expiresAt}` JSON shape | Verified during U1 spike. If different, `OAuthCredentialsParser` needs a Windows variant. |
-| U3 | Gemini CLI Windows paths for `logs.json` and OAuth credentials | Same approach — install, inspect `%USERPROFILE%\.gemini\` or `%LOCALAPPDATA%\Google\Gemini\`. |
+| U1 | ~~Where Claude Code stores OAuth credentials on Windows~~ | **Resolved (M0):** `%USERPROFILE%\.claude\.credentials.json` (plain JSON). |
+| U2 | ~~Whether Claude Code on Windows uses the same `claudeAiOauth.{accessToken,refreshToken,expiresAt}` JSON shape~~ | **Resolved (M0):** same `claudeAiOauth.*` shape; three extra non-required fields (`scopes`, `subscriptionType`, `rateLimitTier`) ignored by the parser. `expiresAt` is in milliseconds. |
+| U3 | ~~Gemini CLI Windows paths for `logs.json` and OAuth credentials~~ | **Resolved (M0):** OAuth at `%USERPROFILE%\.gemini\oauth_creds.json` (same as mac). **Logs format diverges:** Gemini CLI v0.43.0 leaves `logs.json` empty and writes prompts to `%USERPROFILE%\.gemini\tmp\<project>\chats\session-*.jsonl` (JSONL, `content:[{text}]`). M3 reader must consume the JSONL session files, not `logs.json`. See [findings](../findings/2026-05-26-windows-creds-spike.md) §U3b. |
 | U4 | SignPath.io OSS plan acceptance | Apply once the Windows directory has activity. Fallback: ship unsigned for v1; add a paid OV cert if grant is denied. |
 | U5 | WinGet listing approval cadence | Microsoft moderation takes 1–7 days first time. First release does not gate on WinGet; manifest submitted asynchronously. |
 
