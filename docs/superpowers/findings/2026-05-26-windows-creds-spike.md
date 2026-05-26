@@ -200,4 +200,31 @@ Saved at `docs/superpowers/findings/fixtures/gemini-logs-sanitized.json`. The fi
 
 ## Resolution summary
 
-<filled by Task 8>
+### U1 — Claude Code credential location
+- Path / mechanism: `%USERPROFILE%\.claude\.credentials.json` (plain JSON, no DPAPI, no Credential Manager).
+- Concrete reader class to build in M1: `ClaudeJsonFileReader`.
+
+### U2 — JSON shape
+- Top-level key: `claudeAiOauth` (matches mac).
+- `expiresAt` units: milliseconds.
+- Extra fields beyond mac shape: `scopes` (string[]), `subscriptionType` (string), `rateLimitTier` (string). None are required to validate or refresh the OAuth token.
+- Parser changes needed in M1: none — the OAuthCredentials C# record should declare only the three required fields and tolerate unknown JSON properties (default for `System.Text.Json` when no `JsonSerializerOptions.UnknownTypeHandling` is set to throw).
+
+### U3 — Gemini CLI
+- Credentials path: `%USERPROFILE%\.gemini\oauth_creds.json` (same as mac).
+- `logs.json` path: present at `%USERPROFILE%\.gemini\tmp\<initial-login-dir>\logs.json` but **always empty `[]`** in Gemini CLI v0.43.0. Prompt records have moved to `%USERPROFILE%\.gemini\tmp\<project>\chats\session-<iso>-<hash>.jsonl`.
+- `logs.json` shape: **differs from mac** — the active path is JSONL, not a JSON array, and user-prompt records use `content: [{text}]` instead of `message: string`.
+- Parser changes needed in M3: substantial. The Windows `GeminiUsageReader` equivalent must:
+  1. Iterate `~/.gemini/tmp/<project>/chats/session-*.jsonl` per project (not `logs.json`).
+  2. Parse JSONL (line-delimited) and skip session-header / `$set` sentinel records.
+  3. Read user-prompt text from `content[0].text` (not `message`).
+  4. Apply the same "today + non-slash-command + type==user" filter.
+  - **Open question for M3 planning:** confirm whether macOS Gemini CLI ≥ v0.43.0 produces the same JSONL-based layout. If yes, the mac reader is also stale and should be retargeted in M3, not just the Windows port. If macOS Gemini still writes the legacy array `logs.json`, M3 needs a version-aware reader.
+
+### Impact on spec
+
+- [ ] Section "Module mapping" placeholder `<concrete reader chosen after U1 spike>` → replace with `ClaudeJsonFileReader`.
+- [ ] Section "Credential reading" — narrow the three candidates down to the confirmed one. Add a footnote with the verified path.
+- [ ] Section "Project layout" `<ConcreteCredentialReader>.cs` → replace with `ClaudeJsonFileReader.cs`.
+- [ ] U2 surfaced minor extra fields — note that the C# parser must tolerate unknown JSON properties (default `System.Text.Json` behaviour, no extra design work).
+- [ ] U3 surfaced a structural divergence in Gemini logging — add a "Gemini usage source on Windows" note: the reader must consume `~/.gemini/tmp/<project>/chats/session-*.jsonl`, not `logs.json`. This affects the M3 plan; the spec's "Risks and unknowns" table should record it as resolved-with-impact.
