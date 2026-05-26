@@ -129,6 +129,75 @@ Result: **directory does not exist**.
 
 **Resolution:** Gemini CLI credentials on Windows at `%USERPROFILE%\.gemini\oauth_creds.json`. File-existence check (used by `detectCredentials()` on mac) maps to: `%USERPROFILE%\.gemini\oauth_creds.json`. Same layout as mac (`~/.gemini/oauth_creds.json`).
 
+### U3b — `logs.json` path and shape (MAJOR DIVERGENCE from mac)
+
+**Gemini CLI version probed:** 0.43.0
+
+#### Where prompt records live on Windows v0.43.0
+
+| Path | Status |
+|---|---|
+| `%USERPROFILE%\.gemini\logs.json` | Does not exist |
+| `%USERPROFILE%\.gemini\tmp\logs.json` | Does not exist |
+| `%LOCALAPPDATA%\Google\Gemini\logs.json` | Does not exist (parent dir absent) |
+| `%USERPROFILE%\.gemini\tmp\<initial-login-dir>\logs.json` | **Exists but empty `[]`** — written only at first login |
+| `%USERPROFILE%\.gemini\tmp\<project>\logs.json` (for each cwd where gemini is invoked) | **Not created** in v0.43.0 |
+| `%USERPROFILE%\.gemini\tmp\<project>\chats\session-<iso>-<short-hash>.jsonl` | **Where prompts actually go** |
+
+#### Reproduction
+
+```powershell
+$env:GEMINI_CLI_TRUST_WORKSPACE = "true"
+gemini -p "hello from the spike"
+gemini -p "what is 2+2"
+Get-ChildItem -Recurse "$env:USERPROFILE\.gemini\tmp"
+```
+
+Result: `logs.json` size stays at 2 bytes (`[]`). Two new `session-*.jsonl` files appear under `tmp\<project>\chats\`.
+
+#### Per-session JSONL record format
+
+Format: **JSONL** (one JSON object per line), **not** the JSON array of objects the mac `GeminiUsageReader` expects.
+
+Record kinds and fields:
+
+- Session header (first line of file):
+  ```
+  {"sessionId":"<uuid>","projectHash":"<sha256-hex>","startTime":"<ISO-8601-frac>","lastUpdated":"<ISO-8601-frac>","kind":"main"}
+  ```
+- User prompt:
+  ```
+  {"id":"<uuid>","timestamp":"<ISO-8601-frac>","type":"user","content":[{"text":"<prompt>"}]}
+  ```
+  **Note:** `content` is an array of `{text}` objects, **not** the flat `message: string` field the mac reader's `record["message"] as? String` lookup expects.
+- Session-update sentinel (interleaved between real records):
+  ```
+  {"$set":{"lastUpdated":"<ISO-8601-frac>"}}
+  ```
+- Model reply:
+  ```
+  {"id":"<uuid>","timestamp":"<ISO-8601-frac>","type":"gemini","content":"<text>","thoughts":[...],"tokens":{...},"model":"<model-id>"}
+  ```
+
+Timestamp format: ISO-8601 with fractional seconds and a `Z` suffix (matches `GeminiUsageReader.isoFractional`).
+
+#### Comparison with mac reader expectations
+
+| Reader expectation (`GeminiUsageReader.swift`) | Windows v0.43.0 reality |
+|---|---|
+| File at `<geminiHome>/tmp/<project>/logs.json` | `logs.json` empty `[]`; data in `tmp/<project>/chats/session-*.jsonl` |
+| Top-level: JSON array of objects | JSONL, per-line objects |
+| User prompt record: `{type:"user", message:string, timestamp:string}` | `{type:"user", content:[{text:string}], timestamp:string}` |
+| Slash-command filter: `record["message"].hasPrefix("/")` | Need to read `content[0].text` instead |
+| Timestamp: ISO-8601, optional fractional seconds | Always fractional seconds + `Z` |
+| Model-reply record schema (untyped — currently filtered out by `type != "user"` check) | `type:"gemini"`, `content:string` (not array), plus `tokens`, `model`, `thoughts` |
+
+#### Sanitized fixture
+
+Saved at `docs/superpowers/findings/fixtures/gemini-logs-sanitized.json`. The fixture is a JSON wrapper around two real session-jsonl files captured during this spike (prompt text kept, IDs / hashes redacted, model reply text replaced with `<redacted-model-reply>`). It includes a `_per_record_schema` describing each line kind, so M3 tests can validate the parser against the v0.43.0 shape.
+
+**Resolution:** Gemini `logs.json` on Windows v0.43.0 is **not the data source** — prompt history moved to `~/.gemini/tmp/<project>/chats/session-<iso>-<hash>.jsonl`. Top-level shape: **JSONL** (line-delimited objects), not a JSON array. Timestamp field: `timestamp` (ISO-8601 with fractional seconds, UTC `Z`). Per-entry fields **do NOT match mac**: user prompts use `content: [{ text }]` instead of `message: string`. This is a substantive divergence. The mac `GeminiUsageReader` will read 0 prompts on Windows v0.43.0 even after a successful login + active use. M3 must either (a) reimplement against session JSONL on Windows, or (b) confirm whether mac Gemini still produces the legacy array-shaped `logs.json` and, if not, retarget the mac reader to the new shape too.
+
 ## Resolution summary
 
 <filled by Task 8>

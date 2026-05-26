@@ -1,0 +1,50 @@
+{
+  "_comment": "Gemini CLI v0.43.0 on Windows abandoned the array-shaped logs.json that the mac GeminiUsageReader expects. Per-project logs.json is either absent or an empty `[]` placeholder. Actual prompt history lives in JSONL session files under `~/.gemini/tmp/<project>/chats/session-<iso>-<short-hash>.jsonl`. The format below is one such file, sanitized. The fixture is JSON-encoded (object containing an array of the lines) so it can be loaded by tests that need both the raw JSONL string and the parsed records.",
+  "_source": "~/.gemini/tmp/<project>/chats/session-<timestamp>-<id>.jsonl",
+  "_format": "JSONL (one JSON object per line) — NOT a JSON array",
+  "_per_record_schema": {
+    "session_header": {
+      "sessionId": "uuid",
+      "projectHash": "sha256-hex",
+      "startTime": "ISO-8601 with fractional seconds and Z",
+      "lastUpdated": "ISO-8601 with fractional seconds and Z",
+      "kind": "main"
+    },
+    "user_prompt": {
+      "id": "uuid",
+      "timestamp": "ISO-8601 with fractional seconds and Z",
+      "type": "user",
+      "content": "[{ text: string }]  -- array, NOT a flat message string"
+    },
+    "model_reply": {
+      "id": "uuid",
+      "timestamp": "ISO-8601 with fractional seconds and Z",
+      "type": "gemini",
+      "content": "string  -- when type==gemini, content is a flat string, not an array",
+      "thoughts": "[]",
+      "tokens": {
+        "input": "int",
+        "output": "int",
+        "cached": "int",
+        "thoughts": "int",
+        "tool": "int",
+        "total": "int"
+      },
+      "model": "string  -- e.g. 'gemini-3-flash-preview'"
+    },
+    "session_update": {
+      "$set": { "lastUpdated": "ISO-8601 with fractional seconds and Z" }
+    }
+  },
+  "_jsonl_lines": [
+    "{\"sessionId\":\"<redacted-uuid>\",\"projectHash\":\"<redacted-sha256>\",\"startTime\":\"2026-05-26T18:13:00.915Z\",\"lastUpdated\":\"2026-05-26T18:13:00.915Z\",\"kind\":\"main\"}",
+    "{\"id\":\"<redacted-uuid>\",\"timestamp\":\"2026-05-26T18:13:02.337Z\",\"type\":\"user\",\"content\":[{\"text\":\"hello from the spike\"}]}",
+    "{\"$set\":{\"lastUpdated\":\"2026-05-26T18:13:02.338Z\"}}",
+    "{\"id\":\"<redacted-uuid>\",\"timestamp\":\"2026-05-26T18:13:04.669Z\",\"type\":\"gemini\",\"content\":\"<redacted-model-reply>\",\"thoughts\":[],\"tokens\":{\"input\":8477,\"output\":75,\"cached\":0,\"thoughts\":0,\"tool\":0,\"total\":8552},\"model\":\"gemini-3-flash-preview\"}",
+    "{\"$set\":{\"lastUpdated\":\"2026-05-26T18:13:04.670Z\"}}",
+    "{\"id\":\"<redacted-uuid>\",\"timestamp\":\"2026-05-26T18:16:07.820Z\",\"type\":\"user\",\"content\":[{\"text\":\"what is 2+2\"}]}",
+    "{\"$set\":{\"lastUpdated\":\"2026-05-26T18:16:07.822Z\"}}",
+    "{\"id\":\"<redacted-uuid>\",\"timestamp\":\"2026-05-26T18:16:09.888Z\",\"type\":\"gemini\",\"content\":\"<redacted-model-reply>\",\"thoughts\":[],\"tokens\":{\"input\":8483,\"output\":8,\"cached\":0,\"thoughts\":139,\"tool\":0,\"total\":8630},\"model\":\"gemini-3-flash-preview\"}",
+    "{\"$set\":{\"lastUpdated\":\"2026-05-26T18:16:09.889Z\"}}"
+  ]
+}
