@@ -97,7 +97,37 @@ Saved at `docs/superpowers/findings/fixtures/claude-credentials-sanitized.json`.
 
 ## U3 — Gemini CLI paths
 
-<filled by Tasks 5 and 6>
+### U3a — Credentials
+
+#### Candidate 1 — `%USERPROFILE%\.gemini\`
+
+**Exists:** yes (`C:\Users\Cherise\.gemini\`).
+
+Relevant files after login:
+
+| Name | Length | LastWriteTime |
+|---|---|---|
+| `oauth_creds.json` | 1833 | 2026-05-27 01:11:25 |
+| `google_accounts.json` | 53 | 2026-05-27 01:11:26 |
+| `installation_id` | 36 | 2026-05-27 01:11:08 |
+| `projects.json` | 59 | 2026-05-27 01:11:02 |
+| `settings.json` | 82 | 2026-05-27 01:11:19 |
+| `state.json` | 187 | 2026-05-27 01:11:41 |
+| `trustedFolders.json` | 40 | 2026-05-27 01:11:10 |
+| `tmp\cherise\logs.json` | 2 | 2026-05-27 01:11:08 (covered in U3b) |
+| `tmp\cherise\chats\session-*.jsonl` | varies | per-session chat log |
+
+`oauth_creds.json` present — credential file for OAuth tokens.
+
+#### Candidate 2 — `%LOCALAPPDATA%\Google\Gemini\`
+
+Result: **directory does not exist**.
+
+#### Candidate 3 — `%APPDATA%\Google\Gemini\`
+
+Result: **directory does not exist**.
+
+**Resolution:** Gemini CLI credentials on Windows at `%USERPROFILE%\.gemini\oauth_creds.json`. File-existence check (used by `detectCredentials()` on mac) maps to: `%USERPROFILE%\.gemini\oauth_creds.json`. Same layout as mac (`~/.gemini/oauth_creds.json`).
 
 ## Resolution summary
 
