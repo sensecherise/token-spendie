@@ -14,7 +14,39 @@ U3 (Gemini CLI Windows paths).
 
 ## U1 — Claude Code credential storage location
 
-<filled by Task 2>
+### Candidate 1 — `%USERPROFILE%\.claude\`
+
+**Exists:** yes (`C:\Users\Cherise\.claude\`).
+
+Files present (relevant):
+
+| Name | Length | LastWriteTime |
+|---|---|---|
+| `.credentials.json` | 470 | 2026-05-27 00:13:05 |
+| `settings.json` | 1224 | 2026-05-27 00:49:14 |
+| `history.jsonl` | 4566 | 2026-05-27 01:04:44 |
+| `mcp-needs-auth-cache.json` | 94 | 2026-05-27 00:17:04 |
+| (subdirs: `backups`, `cache`, `downloads`, `hooks`, `ide`, `paste-cache`, `plans`, `plugins`, `projects`, `session-env`, `sessions`, `shell-snapshots`, `tasks`) | — | — |
+
+`.credentials.json` present — strong candidate for OAuth storage.
+
+### Candidate 2 — Windows Credential Manager
+
+```
+cmdkey /list | Select-String -Pattern "claude|anthropic" -CaseSensitive:$false
+```
+
+Result: **no matches**. Claude Code does not register a generic credential with Credential Manager on Windows.
+
+### Candidate 3 — `%LOCALAPPDATA%\AnthropicClaude\`
+
+Result: **directory does not exist**.
+
+### Procmon trace
+
+Skipped — Candidate 1 produced a clear hit (`.credentials.json` plain file).
+
+**Resolution:** Credentials stored at `%USERPROFILE%\.claude\.credentials.json` as a plain-json file. Same path layout as macOS (`~/.claude/.credentials.json`), no DPAPI wrapping, no Credential Manager entry.
 
 ## U2 — Claude Code credential JSON shape
 
