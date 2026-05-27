@@ -46,9 +46,11 @@ public partial class App : Application
         _store.PropertyChanged += OnStorePropertyChanged;
         _store.Start();
 
-        var trayVm = new TrayIconViewModel(_store);
+        var trayVm = new TrayIconViewModel(_store, _preferences);
         var panelVm = new DetailPanelViewModel(_store);
-        _tray = new TrayIconController(trayVm, panelVm);
+        var prefsVm = new PreferencesViewModel(_preferences);
+        var floatingVm = new FloatingPanelViewModel(_preferences, panelVm);
+        _tray = new TrayIconController(trayVm, panelVm, _preferences, prefsVm, floatingVm);
     }
 
     private void OnStorePropertyChanged(object? sender, PropertyChangedEventArgs e)
