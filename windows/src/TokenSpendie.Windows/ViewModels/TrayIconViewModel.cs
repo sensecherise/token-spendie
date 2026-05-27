@@ -19,6 +19,8 @@ public partial class TrayIconViewModel : ObservableObject
     [ObservableProperty] private string _toolTipText = "Token Spendie — loading…";
 
     public event System.EventHandler? ShowPopupRequested;
+    public event System.EventHandler? OpenPreferencesRequested;
+    public event System.EventHandler? OpenAboutRequested;
 
     public TrayIconViewModel(UsageStore store, PreferencesStore? preferences = null)
     {
@@ -32,6 +34,7 @@ public partial class TrayIconViewModel : ObservableObject
     private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
     {
         if (e.PropertyName is nameof(PreferencesStore.Theme)) RecomputeFromStore();
+        if (e.PropertyName is nameof(PreferencesStore.LaunchAtLogin)) OnPropertyChanged(nameof(IsLaunchAtLogin));
     }
 
     /// <summary>Called by the host when the icon's monitor DPI changes.</summary>
@@ -41,8 +44,32 @@ public partial class TrayIconViewModel : ObservableObject
         RecomputeFromStore();
     }
 
+    public bool IsLaunchAtLogin => _preferences?.LaunchAtLogin ?? false;
+
     [RelayCommand]
     private void LeftClick() => ShowPopupRequested?.Invoke(this, System.EventArgs.Empty);
+
+    [RelayCommand]
+    private async System.Threading.Tasks.Task Refresh()
+    {
+        await _store.ManualRefreshAsync().ConfigureAwait(false);
+    }
+
+    [RelayCommand]
+    private void OpenPreferences() => OpenPreferencesRequested?.Invoke(this, System.EventArgs.Empty);
+
+    [RelayCommand]
+    private void OpenAbout() => OpenAboutRequested?.Invoke(this, System.EventArgs.Empty);
+
+    [RelayCommand]
+    private void ToggleLaunchAtLogin()
+    {
+        if (_preferences is null) return;
+        _preferences.LaunchAtLogin = !_preferences.LaunchAtLogin;
+    }
+
+    [RelayCommand]
+    private void Quit() => System.Windows.Application.Current?.Shutdown();
 
     private void OnStorePropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
