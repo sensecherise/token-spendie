@@ -24,7 +24,7 @@ public partial class App : Application
 
         _preferences = new PreferencesStore();
         _startup = new RegistryRunKeyStartupService();
-        _preferences.LaunchAtLogin = _startup.IsEnabled();
+        StartupReconciler.Reconcile(_preferences.LaunchAtLogin, _startup);
         _preferences.PropertyChanged += OnPreferencesChanged;
 
         _network = new NetworkAvailabilityObserver();
