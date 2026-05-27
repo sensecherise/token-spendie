@@ -21,6 +21,10 @@ public static class RingIconRenderer
     private static readonly Brush WarnBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0xA2, 0x3F));
     private static readonly Brush HotBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x53, 0x4F));
 
+    /// <summary>Serializes concurrent <see cref="Render"/> calls so the temp ICO file write
+    /// and BitmapImage init don't race when two callers target the same per-process+px file.</summary>
+    private static readonly object RenderLock = new();
+
     static RingIconRenderer()
     {
         TrackBrush.Freeze();
@@ -30,6 +34,14 @@ public static class RingIconRenderer
     }
 
     public static ImageSource Render(double percent, UsageLevel level, double dpiScale)
+    {
+        lock (RenderLock)
+        {
+            return RenderCore(percent, level, dpiScale);
+        }
+    }
+
+    private static ImageSource RenderCore(double percent, UsageLevel level, double dpiScale)
     {
         var px = DpiHelper.IconPx(dpiScale);
         var visual = new DrawingVisual();

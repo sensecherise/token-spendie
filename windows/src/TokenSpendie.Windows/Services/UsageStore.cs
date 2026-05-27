@@ -12,7 +12,6 @@ namespace TokenSpendie.Windows.Services;
 /// </summary>
 public sealed class UsageStore : INotifyPropertyChanged, IAsyncDisposable
 {
-    public static readonly TimeSpan RefreshInterval = TimeSpan.FromSeconds(30);
     private static readonly TimeSpan ManualRefreshMinGap = TimeSpan.FromSeconds(2);
     private static readonly TimeSpan FreshCacheWindow = TimeSpan.FromSeconds(60);
     private static readonly TimeSpan[] BackoffSteps =
@@ -24,9 +23,26 @@ public sealed class UsageStore : INotifyPropertyChanged, IAsyncDisposable
         System.Array.Empty<ProviderUsage>();
     public bool IsRefreshing { get; private set; }
 
+    /// <summary>The provider whose ring drives the tray icon. Uses the
+    /// preferences pick when that provider is detected; otherwise the first
+    /// detected provider; otherwise null.</summary>
+    public ProviderUsage? MenuBarProvider()
+    {
+        var preferred = _preferences?.MenuBarProviderID;
+        if (preferred is { } pref)
+        {
+            foreach (var u in Providers)
+                if (u.Id == pref) return u;
+        }
+        return Providers.Count > 0 ? Providers[0] : null;
+    }
+
     private readonly IUsageProvider[] _registered;
     private readonly Dictionary<ProviderID, SnapshotCache> _caches;
     private readonly Func<DateTimeOffset> _now;
+    private readonly PreferencesStore? _preferences;
+    private readonly INetworkAvailabilityObserver? _network;
+    private readonly IPowerEventObserver? _power;
 
     private readonly Dictionary<ProviderID, ProviderUsage> _usageByID = new();
     private readonly Dictionary<ProviderID, DateTimeOffset> _backoffUntil = new();
@@ -41,13 +57,25 @@ public sealed class UsageStore : INotifyPropertyChanged, IAsyncDisposable
     public UsageStore(
         IEnumerable<IUsageProvider> providers,
         Func<ProviderID, SnapshotCache>? cacheFactory = null,
-        Func<DateTimeOffset>? now = null)
+        Func<DateTimeOffset>? now = null,
+        PreferencesStore? preferences = null,
+        INetworkAvailabilityObserver? network = null,
+        IPowerEventObserver? power = null)
     {
         _registered = providers.ToArray();
         cacheFactory ??= id => new SnapshotCache(SnapshotCache.DefaultPathFor(id));
         _caches = _registered.ToDictionary(p => p.Id, p => cacheFactory(p.Id));
         _now = now ?? (() => DateTimeOffset.Now);
+        _preferences = preferences;
+        _network = network;
+        _power = power;
+
+        if (_network is not null) _network.Reconnected += OnNetworkReconnected;
+        if (_power is not null) _power.Resumed += OnPowerResumed;
     }
+
+    private void OnNetworkReconnected(object? sender, EventArgs e) => _ = RefreshAsync();
+    private void OnPowerResumed(object? sender, EventArgs e) => _ = RefreshAsync();
 
     /// <summary>Loads cached snapshots, starts the polling timer.</summary>
     public void Start()
@@ -76,7 +104,8 @@ public sealed class UsageStore : INotifyPropertyChanged, IAsyncDisposable
         Publish(_registered.Select(p => p.Id));
 
         _cts = new CancellationTokenSource();
-        _timer = new PeriodicTimer(RefreshInterval);
+        var interval = _preferences?.RefreshInterval.AsTimeSpan() ?? TimeSpan.FromSeconds(60);
+        _timer = new PeriodicTimer(interval);
         _loopTask = LoopAsync(_cts.Token);
     }
 
@@ -222,7 +251,8 @@ public sealed class UsageStore : INotifyPropertyChanged, IAsyncDisposable
 
     private void MarkStaleIfNeeded()
     {
-        var threshold = RefreshInterval * 3;
+        var interval = _preferences?.RefreshInterval.AsTimeSpan() ?? TimeSpan.FromSeconds(60);
+        var threshold = interval * 3;
         foreach (var (id, usage) in _usageByID.ToArray())
         {
             if (usage.State != LoadState.Ok) continue;
@@ -246,6 +276,8 @@ public sealed class UsageStore : INotifyPropertyChanged, IAsyncDisposable
 
     public async ValueTask DisposeAsync()
     {
+        if (_network is not null) _network.Reconnected -= OnNetworkReconnected;
+        if (_power is not null) _power.Resumed -= OnPowerResumed;
         _cts?.Cancel();
         if (_loopTask is not null)
         {
