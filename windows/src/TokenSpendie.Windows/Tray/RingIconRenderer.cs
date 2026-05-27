@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
@@ -9,7 +10,8 @@ namespace TokenSpendie.Windows.Tray;
 /// <summary>
 /// Renders a usage-ring tray icon: a faint track plus a coloured arc that sweeps
 /// clockwise from 12 o'clock by `percent`%. Always returns a frozen
-/// <see cref="RenderTargetBitmap"/> safe to assign across threads.
+/// <see cref="BitmapImage"/> (backed by a temp PNG file) safe to assign across
+/// threads and accepted by H.NotifyIcon.Wpf 2.1.4 as an <c>IconSource</c>.
 /// </summary>
 public static class RingIconRenderer
 {
@@ -67,7 +69,23 @@ public static class RingIconRenderer
             PixelFormats.Pbgra32);
         rtb.Render(visual);
         rtb.Freeze();
-        return rtb;
+
+        // H.NotifyIcon.Wpf 2.1.4 only accepts BitmapImage (with a UriSource) or BitmapFrame
+        // (treated as a URI via ToString). RenderTargetBitmap triggers NotImplementedException
+        // and BitmapFrame created from a stream gives an empty ToString → UriFormatException.
+        // Encode to a temp PNG file so BitmapImage.UriSource is a valid file:// URI that
+        // H.NotifyIcon can open as a stream to build the HICON.
+        var encoder = new PngBitmapEncoder();
+        encoder.Frames.Add(BitmapFrame.Create(rtb));
+        var tmpPath = Path.Combine(Path.GetTempPath(), $"tokspendie_{px}_{System.Guid.NewGuid():N}.png");
+        using (var fs = new FileStream(tmpPath, FileMode.CreateNew, FileAccess.Write, FileShare.Read))
+        {
+            encoder.Save(fs);
+        }
+
+        var bmp = new BitmapImage(new Uri(tmpPath, UriKind.Absolute));
+        bmp.Freeze();
+        return bmp;
     }
 
     private static Point PointOnCircle(Point center, double radius, double angleDeg)

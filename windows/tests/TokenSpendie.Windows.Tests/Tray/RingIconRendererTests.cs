@@ -21,8 +21,8 @@ public class RingIconRendererTests
     {
         // At 2.0 scale → 32×32 px.
         var icon = RingIconRenderer.Render(percent: 75, level: UsageLevel.Warn, dpiScale: 2.0);
-        ((System.Windows.Media.Imaging.RenderTargetBitmap)icon!).PixelWidth.Should().Be(32);
-        ((System.Windows.Media.Imaging.RenderTargetBitmap)icon).PixelHeight.Should().Be(32);
+        ((System.Windows.Media.Imaging.BitmapSource)icon!).PixelWidth.Should().Be(32);
+        ((System.Windows.Media.Imaging.BitmapSource)icon).PixelHeight.Should().Be(32);
     }
 
     [StaFact]
