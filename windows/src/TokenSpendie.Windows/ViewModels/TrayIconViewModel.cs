@@ -12,6 +12,7 @@ namespace TokenSpendie.Windows.ViewModels;
 public partial class TrayIconViewModel : ObservableObject
 {
     private readonly UsageStore _store;
+    private readonly PreferencesStore? _preferences;
     private double _dpiScale = 1.0;
 
     [ObservableProperty] private ImageSource? _iconSource;
@@ -19,11 +20,18 @@ public partial class TrayIconViewModel : ObservableObject
 
     public event System.EventHandler? ShowPopupRequested;
 
-    public TrayIconViewModel(UsageStore store)
+    public TrayIconViewModel(UsageStore store, PreferencesStore? preferences = null)
     {
         _store = store;
+        _preferences = preferences;
         _store.PropertyChanged += OnStorePropertyChanged;
+        if (_preferences is not null) _preferences.PropertyChanged += OnPreferencesChanged;
         RecomputeFromStore();
+    }
+
+    private void OnPreferencesChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName is nameof(PreferencesStore.Theme)) RecomputeFromStore();
     }
 
     /// <summary>Called by the host when the icon's monitor DPI changes.</summary>
@@ -45,18 +53,20 @@ public partial class TrayIconViewModel : ObservableObject
     private void RecomputeFromStore()
     {
         var headline = HeadlineProvider();
+        var theme = _preferences?.Theme ?? Theme.Default;
         if (headline?.Snapshot is null)
         {
             // No data yet — show a faint placeholder ring so the tray icon
             // appears at app launch (H.NotifyIcon won't draw a null IconSource).
-            IconSource = RingIconRenderer.Render(percent: 0, level: UsageLevel.Calm, dpiScale: _dpiScale);
+            IconSource = RingIconRenderer.Render(percent: 0, level: UsageLevel.Calm,
+                dpiScale: _dpiScale, theme: theme);
             ToolTipText = "Token Spendie — loading…";
             return;
         }
 
         var percent = headline.Snapshot.Headline.Window.Percent;
         var level = UsageLevelExtensions.ForPercent(percent);
-        IconSource = RingIconRenderer.Render(percent, level, _dpiScale);
+        IconSource = RingIconRenderer.Render(percent, level, _dpiScale, theme);
         ToolTipText = $"Token Spendie — {headline.DisplayName} {percent:F0}%";
     }
 
