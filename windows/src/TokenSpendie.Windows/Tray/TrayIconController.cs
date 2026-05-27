@@ -1,5 +1,8 @@
+using System.ComponentModel;
 using System.Windows;
+using System.Windows.Controls;
 using H.NotifyIcon;
+using TokenSpendie.Windows.Services;
 using TokenSpendie.Windows.ViewModels;
 using TokenSpendie.Windows.Windows;
 
@@ -10,49 +13,130 @@ public sealed class TrayIconController : System.IDisposable
     private readonly TaskbarIcon _icon;
     private readonly TrayIconViewModel _vm;
     private readonly DetailPanelViewModel _panelVm;
-    private PopupWindow? _popup;
+    private readonly PreferencesStore _preferences;
+    private readonly PreferencesViewModel _prefsVm;
+    private readonly FloatingPanelViewModel _floatingVm;
 
-    public TrayIconController(TrayIconViewModel vm, DetailPanelViewModel panelVm)
+    private PopupWindow? _popup;
+    private PreferencesWindow? _prefsWindow;
+    private AboutWindow? _aboutWindow;
+    private FloatingPanelWindow? _floatingWindow;
+
+    public TrayIconController(
+        TrayIconViewModel vm,
+        DetailPanelViewModel panelVm,
+        PreferencesStore preferences,
+        PreferencesViewModel prefsVm,
+        FloatingPanelViewModel floatingVm)
     {
         _vm = vm;
         _panelVm = panelVm;
+        _preferences = preferences;
+        _prefsVm = prefsVm;
+        _floatingVm = floatingVm;
+
         _icon = new TaskbarIcon
         {
             DataContext = _vm,
             ToolTipText = _vm.ToolTipText,
-            Visibility = Visibility.Visible,
+            Visibility = _preferences.ShowMenuBar ? Visibility.Visible : Visibility.Collapsed,
         };
-        var iconBinding = new System.Windows.Data.Binding(nameof(TrayIconViewModel.IconSource))
-        {
-            Source = _vm,
-        };
-        System.Windows.Data.BindingOperations.SetBinding(_icon,
-            TaskbarIcon.IconSourceProperty, iconBinding);
-        var toolTipBinding = new System.Windows.Data.Binding(nameof(TrayIconViewModel.ToolTipText))
-        {
-            Source = _vm,
-        };
-        System.Windows.Data.BindingOperations.SetBinding(_icon,
-            TaskbarIcon.ToolTipTextProperty, toolTipBinding);
+
+        var iconBinding = new System.Windows.Data.Binding(nameof(TrayIconViewModel.IconSource)) { Source = _vm };
+        System.Windows.Data.BindingOperations.SetBinding(_icon, TaskbarIcon.IconSourceProperty, iconBinding);
+
+        var toolTipBinding = new System.Windows.Data.Binding(nameof(TrayIconViewModel.ToolTipText)) { Source = _vm };
+        System.Windows.Data.BindingOperations.SetBinding(_icon, TaskbarIcon.ToolTipTextProperty, toolTipBinding);
+
         _icon.LeftClickCommand = _vm.LeftClickCommand;
-        _icon.ForceCreate();   // register with the shell tray now; we are not in a WPF visual tree
+        _icon.ContextMenu = BuildContextMenu();
+
         _vm.ShowPopupRequested += OnShowPopupRequested;
+        _vm.OpenPreferencesRequested += (_, _) => OpenPreferences();
+        _vm.OpenAboutRequested += (_, _) => OpenAbout();
+
+        _preferences.PropertyChanged += OnPrefsChanged;
+
+        _icon.ForceCreate();
+
+        ApplyFloatingPanelVisibility();
+    }
+
+    private ContextMenu BuildContextMenu()
+    {
+        var menu = new ContextMenu();
+        menu.Items.Add(new MenuItem { Header = "Refresh", Command = _vm.RefreshCommand });
+        menu.Items.Add(new MenuItem { Header = "Preferences…", Command = _vm.OpenPreferencesCommand });
+        menu.Items.Add(new MenuItem { Header = "About", Command = _vm.OpenAboutCommand });
+        menu.Items.Add(new Separator());
+        var launchItem = new MenuItem
+        {
+            Header = "Launch at login",
+            IsCheckable = true,
+            Command = _vm.ToggleLaunchAtLoginCommand,
+        };
+        var checkedBinding = new System.Windows.Data.Binding(nameof(TrayIconViewModel.IsLaunchAtLogin))
+        {
+            Source = _vm,
+            Mode = System.Windows.Data.BindingMode.OneWay,
+        };
+        System.Windows.Data.BindingOperations.SetBinding(launchItem, MenuItem.IsCheckedProperty, checkedBinding);
+        menu.Items.Add(launchItem);
+        menu.Items.Add(new Separator());
+        menu.Items.Add(new MenuItem { Header = "Quit", Command = _vm.QuitCommand });
+        return menu;
     }
 
     private void OnShowPopupRequested(object? sender, System.EventArgs e)
     {
-        if (_popup is { IsVisible: true })
-        {
-            _popup.Hide();
-            return;
-        }
+        if (_popup is { IsVisible: true }) { _popup.Hide(); return; }
         _popup ??= new PopupWindow { DataContext = _panelVm };
         PositionPopup(_popup);
         _popup.Show();
         _popup.Activate();
     }
 
-    private void PositionPopup(PopupWindow popup)
+    private void OpenPreferences()
+    {
+        _prefsWindow ??= new PreferencesWindow { DataContext = _prefsVm };
+        _prefsWindow.Show();
+        _prefsWindow.Activate();
+    }
+
+    private void OpenAbout()
+    {
+        _aboutWindow ??= new AboutWindow();
+        _aboutWindow.Show();
+        _aboutWindow.Activate();
+    }
+
+    private void OnPrefsChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(PreferencesStore.ShowMenuBar))
+        {
+            _icon.Visibility = _preferences.ShowMenuBar ? Visibility.Visible : Visibility.Collapsed;
+        }
+        else if (e.PropertyName == nameof(PreferencesStore.ShowFloatingPanel))
+        {
+            ApplyFloatingPanelVisibility();
+        }
+    }
+
+    private void ApplyFloatingPanelVisibility()
+    {
+        if (_preferences.ShowFloatingPanel)
+        {
+            _floatingWindow ??= new FloatingPanelWindow();
+            _floatingWindow.Bind(_floatingVm);
+            _floatingWindow.Show();
+        }
+        else
+        {
+            _floatingWindow?.Hide();
+        }
+    }
+
+    private static void PositionPopup(PopupWindow popup)
     {
         GetCursorPos(out var pt);
         var work = SystemParameters.WorkArea;
@@ -64,6 +148,9 @@ public sealed class TrayIconController : System.IDisposable
     {
         _icon.Dispose();
         _popup?.Close();
+        _prefsWindow?.Close();
+        _aboutWindow?.Close();
+        _floatingWindow?.Close();
     }
 
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential)]
