@@ -47,6 +47,9 @@ public partial class TrayIconViewModel : ObservableObject
         var headline = HeadlineProvider();
         if (headline?.Snapshot is null)
         {
+            // No data yet — show a faint placeholder ring so the tray icon
+            // appears at app launch (H.NotifyIcon won't draw a null IconSource).
+            IconSource = RingIconRenderer.Render(percent: 0, level: UsageLevel.Calm, dpiScale: _dpiScale);
             ToolTipText = "Token Spendie — loading…";
             return;
         }

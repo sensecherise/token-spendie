@@ -35,6 +35,7 @@ public sealed class TrayIconController : System.IDisposable
         System.Windows.Data.BindingOperations.SetBinding(_icon,
             TaskbarIcon.ToolTipTextProperty, toolTipBinding);
         _icon.LeftClickCommand = _vm.LeftClickCommand;
+        _icon.ForceCreate();   // register with the shell tray now; we are not in a WPF visual tree
         _vm.ShowPopupRequested += OnShowPopupRequested;
     }
 
