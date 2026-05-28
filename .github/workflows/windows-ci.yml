@@ -1,0 +1,67 @@
+name: Windows CI
+
+on:
+  pull_request:
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows-ci.yml"
+      - ".config/dotnet-tools.json"
+  push:
+    branches:
+      - develop
+      - main
+    paths:
+      - "windows/**"
+      - ".github/workflows/windows-ci.yml"
+      - ".config/dotnet-tools.json"
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build + test (Release)
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore solution
+        run: dotnet restore windows/TokenSpendie.Windows.sln
+
+      - name: Build (Release)
+        run: dotnet build windows/TokenSpendie.Windows.sln -c Release --no-restore
+
+      - name: Test
+        run: >
+          dotnet test windows/TokenSpendie.Windows.sln -c Release --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory test-results
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-ci-test-results
+          path: test-results/
+          retention-days: 7
