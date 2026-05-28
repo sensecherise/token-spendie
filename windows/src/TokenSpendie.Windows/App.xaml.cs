@@ -35,7 +35,9 @@ public partial class App : Application
         _network = new NetworkAvailabilityObserver();
         _power = new PowerEventObserver();
 
-        _notifier = new UsageNotifier(new WinRtToastSender());
+        var toastSender = new WinRtToastSender();
+        _notifier = new UsageNotifier(toastSender);
+        var updateSvc = new VelopackUpdateService("https://github.com/sensecherise/token-spendie");
 
         var providers = new IUsageProvider[]
         {
@@ -55,7 +57,7 @@ public partial class App : Application
         var panelVm = new DetailPanelViewModel(_store);
         var prefsVm = new PreferencesViewModel(_preferences);
         var floatingVm = new FloatingPanelViewModel(_preferences, panelVm);
-        _tray = new TrayIconController(trayVm, panelVm, _preferences, prefsVm, floatingVm);
+        _tray = new TrayIconController(trayVm, panelVm, _preferences, prefsVm, floatingVm, updateSvc, toastSender);
     }
 
     private void OnStorePropertyChanged(object? sender, PropertyChangedEventArgs e)
