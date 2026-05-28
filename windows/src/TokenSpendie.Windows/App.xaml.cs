@@ -20,6 +20,11 @@ public partial class App : Application
 
     private void App_Startup(object sender, StartupEventArgs e)
     {
+        // MUST be first. Velopack uses this hook to handle install / uninstall /
+        // first-run / update commands passed on the command line. If any UI is
+        // touched before Run() the updater behaves incorrectly.
+        Velopack.VelopackApp.Build().Run();
+
         AumidRegistrar.Register();
 
         _preferences = new PreferencesStore();
