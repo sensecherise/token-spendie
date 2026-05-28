@@ -98,14 +98,22 @@ public sealed class TrayIconController : System.IDisposable
 
     private void OpenPreferences()
     {
-        _prefsWindow ??= new PreferencesWindow { DataContext = _prefsVm };
+        if (_prefsWindow is null)
+        {
+            _prefsWindow = new PreferencesWindow { DataContext = _prefsVm };
+            _prefsWindow.Closed += (_, _) => _prefsWindow = null;
+        }
         _prefsWindow.Show();
         _prefsWindow.Activate();
     }
 
     private void OpenAbout()
     {
-        _aboutWindow ??= new AboutWindow();
+        if (_aboutWindow is null)
+        {
+            _aboutWindow = new AboutWindow();
+            _aboutWindow.Closed += (_, _) => _aboutWindow = null;
+        }
         _aboutWindow.Show();
         _aboutWindow.Activate();
     }
