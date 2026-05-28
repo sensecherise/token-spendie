@@ -23,6 +23,7 @@ public sealed class TrayIconController : System.IDisposable
     private PreferencesWindow? _prefsWindow;
     private AboutWindow? _aboutWindow;
     private FloatingPanelWindow? _floatingWindow;
+    private MenuItem? _lastCheckedItem;
 
     public TrayIconController(
         TrayIconViewModel vm,
@@ -75,8 +76,19 @@ public sealed class TrayIconController : System.IDisposable
         menu.Items.Add(new MenuItem { Header = "Refresh", Command = _vm.RefreshCommand });
         menu.Items.Add(new MenuItem { Header = "Preferences…", Command = _vm.OpenPreferencesCommand });
         menu.Items.Add(new MenuItem { Header = "About", Command = _vm.OpenAboutCommand });
+        _lastCheckedItem = new MenuItem
+        {
+            Header = FormatLastChecked(_preferences.LastUpdateCheck),
+            IsEnabled = false,
+        };
+        menu.Items.Add(_lastCheckedItem);
         menu.Items.Add(new MenuItem { Header = "Check for updates…", Command = _vm.CheckForUpdatesCommand });
         menu.Items.Add(new Separator());
+        menu.Opened += (_, _) =>
+        {
+            if (_lastCheckedItem is not null)
+                _lastCheckedItem.Header = FormatLastChecked(_preferences.LastUpdateCheck);
+        };
         var launchItem = new MenuItem
         {
             Header = "Launch at login",
@@ -171,6 +183,17 @@ public sealed class TrayIconController : System.IDisposable
         {
             _floatingWindow?.Hide();
         }
+    }
+
+    internal static string FormatLastChecked(System.DateTimeOffset? when)
+    {
+        if (when is null) return "Last checked: never";
+        var ago = System.DateTimeOffset.UtcNow - when.Value;
+        if (ago < System.TimeSpan.Zero) return "Last checked: just now";
+        if (ago < System.TimeSpan.FromMinutes(1)) return "Last checked: just now";
+        if (ago < System.TimeSpan.FromHours(1)) return $"Last checked: {(int)ago.TotalMinutes}m ago";
+        if (ago < System.TimeSpan.FromDays(1)) return $"Last checked: {(int)ago.TotalHours}h ago";
+        return $"Last checked: {(int)ago.TotalDays}d ago";
     }
 
     private static void PositionPopup(PopupWindow popup)
