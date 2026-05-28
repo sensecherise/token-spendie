@@ -40,7 +40,90 @@
         Square150x150Logo="assets\Square150x150Logo.png"
         Square44x44Logo="assets\Square44x44Logo.png"
         AppListEntry="none" />
-      <!-- Task 7 inserts the widget-provider extension block here. -->
+
+      <Extensions>
+
+        <!-- COM activation for the widget-provider class. The Id GUID below
+             MUST equal the [Guid] attribute on WidgetProvider.cs (Task 2 +
+             Task 4). -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="TokenSpendie.WidgetProvider.exe"
+                           DisplayName="Token Spendie Widget Provider"
+                           Arguments="-RegisterProcessAsComServer">
+              <com:Class Id="579614A3-768E-46A5-846C-78784B4232A1"
+                         DisplayName="Token Spendie Widget Provider" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+
+        <!-- Tells the widget host this package serves widgets. -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.widgets"
+                             DisplayName="Token Spendie Widgets"
+                             Id="TokenSpendieWidgetExtension"
+                             PublicFolder="Public">
+            <uap3:Properties>
+              <WidgetProvider>
+                <ProviderIcons>
+                  <Icon Path="assets\Square44x44Logo.png" />
+                </ProviderIcons>
+
+                <Activation>
+                  <CreateInstance ClassId="579614A3-768E-46A5-846C-78784B4232A1" />
+                </Activation>
+
+                <Definitions>
+
+                  <Definition Id="TokenSpendie.Session"
+                              DisplayName="Token Spendie — Session"
+                              Description="Current 5-hour session usage at a glance."
+                              AllowMultiple="false"
+                              IsCustomizable="false">
+                    <Capabilities>
+                      <Capability>
+                        <Size Name="small" />
+                      </Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="assets\Square44x44Logo.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="assets\Widget-Session-preview.png"
+                                    DisplayAltText="Token Spendie session widget preview" />
+                      </Screenshots>
+                    </ThemeResources>
+                  </Definition>
+
+                  <Definition Id="TokenSpendie.Full"
+                              DisplayName="Token Spendie — Full"
+                              Description="Session and weekly usage with breakdown."
+                              AllowMultiple="false"
+                              IsCustomizable="false">
+                    <Capabilities>
+                      <Capability>
+                        <Size Name="medium" />
+                      </Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="assets\Square44x44Logo.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="assets\Widget-Full-preview.png"
+                                    DisplayAltText="Token Spendie full widget preview" />
+                      </Screenshots>
+                    </ThemeResources>
+                  </Definition>
+
+                </Definitions>
+              </WidgetProvider>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+
+      </Extensions>
     </Application>
   </Applications>
 
