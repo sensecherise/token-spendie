@@ -5,7 +5,11 @@
     <RootNamespace>TokenSpendie.Windows</RootNamespace>
     <AssemblyName>TokenSpendie.Windows</AssemblyName>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\..\build\icon\AppIcon.ico</ApplicationIcon>
   </PropertyGroup>
+  <ItemGroup>
+    <Resource Include="..\..\build\icon\AppIcon.ico" Link="Resources\AppIcon.ico" />
+  </ItemGroup>
   <!-- WPF SDK's implicit usings omit System.IO and System.Net.Http; restore to match M1 console SDK behaviour. -->
   <ItemGroup>
     <Using Include="System.IO" />
