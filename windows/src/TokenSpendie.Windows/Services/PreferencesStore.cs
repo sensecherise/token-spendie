@@ -18,6 +18,10 @@ public sealed class PreferencesStore : INotifyPropertyChanged
     private bool _launchAtLogin = false;
     private Theme _theme = Theme.Default;
     private ProviderID _menuBarProviderID = ProviderID.Claude;
+    private double? _floatingPanelLeft;
+    private double? _floatingPanelTop;
+    private double _floatingPanelWidth = 260;
+    private double _floatingPanelHeight = 220;
 
     public bool ShowMenuBar { get => _showMenuBar; set => SetAndPersist(ref _showMenuBar, value); }
     public bool ShowFloatingPanel { get => _showFloatingPanel; set => SetAndPersist(ref _showFloatingPanel, value); }
@@ -25,6 +29,10 @@ public sealed class PreferencesStore : INotifyPropertyChanged
     public bool LaunchAtLogin { get => _launchAtLogin; set => SetAndPersist(ref _launchAtLogin, value); }
     public Theme Theme { get => _theme; set => SetAndPersist(ref _theme, value); }
     public ProviderID MenuBarProviderID { get => _menuBarProviderID; set => SetAndPersist(ref _menuBarProviderID, value); }
+    public double? FloatingPanelLeft { get => _floatingPanelLeft; set => SetAndPersist(ref _floatingPanelLeft, value); }
+    public double? FloatingPanelTop { get => _floatingPanelTop; set => SetAndPersist(ref _floatingPanelTop, value); }
+    public double FloatingPanelWidth { get => _floatingPanelWidth; set => SetAndPersist(ref _floatingPanelWidth, value); }
+    public double FloatingPanelHeight { get => _floatingPanelHeight; set => SetAndPersist(ref _floatingPanelHeight, value); }
 
     public PreferencesStore() : this(DefaultPath()) { }
 
@@ -55,6 +63,10 @@ public sealed class PreferencesStore : INotifyPropertyChanged
             _launchAtLogin = dto.LaunchAtLogin ?? _launchAtLogin;
             _theme = dto.Theme ?? _theme;
             _menuBarProviderID = dto.MenuBarProviderID ?? _menuBarProviderID;
+            _floatingPanelLeft = dto.FloatingPanelLeft;
+            _floatingPanelTop = dto.FloatingPanelTop;
+            _floatingPanelWidth = dto.FloatingPanelWidth ?? _floatingPanelWidth;
+            _floatingPanelHeight = dto.FloatingPanelHeight ?? _floatingPanelHeight;
         }
         catch { /* defaults survive */ }
     }
@@ -73,6 +85,10 @@ public sealed class PreferencesStore : INotifyPropertyChanged
                 LaunchAtLogin = _launchAtLogin,
                 Theme = _theme,
                 MenuBarProviderID = _menuBarProviderID,
+                FloatingPanelLeft = _floatingPanelLeft,
+                FloatingPanelTop = _floatingPanelTop,
+                FloatingPanelWidth = _floatingPanelWidth,
+                FloatingPanelHeight = _floatingPanelHeight,
             };
             using var stream = File.Create(_path);
             JsonSerializer.Serialize(stream, dto, JsonOptions);
@@ -110,5 +126,9 @@ public sealed class PreferencesStore : INotifyPropertyChanged
         public bool? LaunchAtLogin { get; set; }
         public Theme? Theme { get; set; }
         public ProviderID? MenuBarProviderID { get; set; }
+        public double? FloatingPanelLeft { get; set; }
+        public double? FloatingPanelTop { get; set; }
+        public double? FloatingPanelWidth { get; set; }
+        public double? FloatingPanelHeight { get; set; }
     }
 }

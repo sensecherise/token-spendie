@@ -17,10 +17,6 @@ public static class RingIconRenderer
 {
     private static readonly Brush TrackBrush = new SolidColorBrush(Color.FromArgb(0x40, 0xFF, 0xFF, 0xFF));
 
-    private static readonly Brush CalmBrush = new SolidColorBrush(Color.FromRgb(0x5F, 0xB8, 0x78));
-    private static readonly Brush WarnBrush = new SolidColorBrush(Color.FromRgb(0xE0, 0xA2, 0x3F));
-    private static readonly Brush HotBrush = new SolidColorBrush(Color.FromRgb(0xD9, 0x53, 0x4F));
-
     /// <summary>Serializes concurrent <see cref="Render"/> calls so the temp ICO file write
     /// and BitmapImage init don't race when two callers target the same per-process+px file.</summary>
     private static readonly object RenderLock = new();
@@ -28,20 +24,17 @@ public static class RingIconRenderer
     static RingIconRenderer()
     {
         TrackBrush.Freeze();
-        CalmBrush.Freeze();
-        WarnBrush.Freeze();
-        HotBrush.Freeze();
     }
 
-    public static ImageSource Render(double percent, UsageLevel level, double dpiScale)
+    public static ImageSource Render(double percent, UsageLevel level, double dpiScale, Theme theme)
     {
         lock (RenderLock)
         {
-            return RenderCore(percent, level, dpiScale);
+            return RenderCore(percent, level, dpiScale, theme);
         }
     }
 
-    private static ImageSource RenderCore(double percent, UsageLevel level, double dpiScale)
+    private static ImageSource RenderCore(double percent, UsageLevel level, double dpiScale, Theme theme)
     {
         var px = DpiHelper.IconPx(dpiScale);
         var visual = new DrawingVisual();
@@ -67,7 +60,9 @@ public static class RingIconRenderer
 
                 var figure = new PathFigure { StartPoint = startPoint };
                 figure.Segments.Add(arc);
-                var pen = new Pen(BrushFor(level), stroke)
+                var arcBrush = new SolidColorBrush(theme.ColorFor(level));
+                arcBrush.Freeze();
+                var pen = new Pen(arcBrush, stroke)
                 {
                     StartLineCap = PenLineCap.Round,
                     EndLineCap = PenLineCap.Round,
@@ -153,11 +148,5 @@ public static class RingIconRenderer
                          center.Y + radius * System.Math.Sin(angleRad));
     }
 
-    private static Brush BrushFor(UsageLevel level) => level switch
-    {
-        UsageLevel.Calm => CalmBrush,
-        UsageLevel.Warn => WarnBrush,
-        UsageLevel.Hot => HotBrush,
-        _ => CalmBrush,
-    };
+
 }
