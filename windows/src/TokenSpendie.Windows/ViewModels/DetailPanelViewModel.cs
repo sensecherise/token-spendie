@@ -14,6 +14,9 @@ public partial class DetailPanelViewModel : ObservableObject
     [ObservableProperty]
     private IReadOnlyList<ProviderRowViewModel> _rows = System.Array.Empty<ProviderRowViewModel>();
 
+    [ObservableProperty]
+    private string _lastRefreshedLabel = "No data yet";
+
     public DetailPanelViewModel(UsageStore store)
     {
         _store = store;
@@ -32,6 +35,22 @@ public partial class DetailPanelViewModel : ObservableObject
             .Where(p => p.Snapshot is not null)
             .Select(p => new ProviderRowViewModel(p))
             .ToArray();
+
+        var newest = Rows.Count == 0
+            ? (System.DateTimeOffset?)null
+            : Rows.Max(r => r.FetchedAt);
+        LastRefreshedLabel = FormatLastRefreshed(newest);
+    }
+
+    internal static string FormatLastRefreshed(System.DateTimeOffset? when)
+    {
+        if (when is null) return "No data yet";
+        var ago = System.DateTimeOffset.UtcNow - when.Value;
+        if (ago < System.TimeSpan.Zero) return "Refreshed just now";
+        if (ago < System.TimeSpan.FromMinutes(1)) return "Refreshed just now";
+        if (ago < System.TimeSpan.FromHours(1)) return $"Refreshed {(int)ago.TotalMinutes}m ago";
+        if (ago < System.TimeSpan.FromDays(1)) return $"Refreshed {(int)ago.TotalHours}h ago";
+        return $"Refreshed {(int)ago.TotalDays}d ago";
     }
 }
 

@@ -1,13 +1,16 @@
+using System;
 using System.Windows;
 using System.Windows.Input;
 
 namespace TokenSpendie.Windows.Windows;
 
-public partial class PopupWindow : Window
+public partial class WidgetsBoardWindow : Window
 {
-    public PopupWindow()
+    public WidgetsBoardWindow()
     {
         InitializeComponent();
+        DateText.Text = DateTime.Now.ToString("MMM d");
+        Activated += (_, _) => DateText.Text = DateTime.Now.ToString("MMM d");
         Deactivated += (_, _) => Hide();
         KeyDown += OnKeyDown;
     }
