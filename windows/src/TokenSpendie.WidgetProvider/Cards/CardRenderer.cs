@@ -36,9 +36,21 @@ public sealed class CardRenderer
 
     public string RenderFull(UsageSnapshot snapshot, string size)
     {
-        // Task 6 replaces this with a real medium-size card. For now, fall
-        // back to the session card so widget hosts still get valid JSON.
-        return RenderSession(snapshot);
+        var sPct = snapshot.Session.Percent;
+        var wPct = snapshot.Weekly.Percent;
+        var level = UsageLevelExtensions.ForPercent(sPct);
+        var ringPng = RingPngRenderer.RenderBase64(sPct, level);
+
+        var data = new
+        {
+            ringDataUri = $"data:image/png;base64,{ringPng}",
+            sessionLine = $"Session  {sPct:F0}%",
+            weeklyLine = $"Weekly  {wPct:F0}%",
+            footerText = FormatFooter(snapshot),
+        };
+
+        var template = new AdaptiveCardTemplate(_fullTemplate.Value);
+        return template.Expand(data);
     }
 
     public static string RenderError(string message)
