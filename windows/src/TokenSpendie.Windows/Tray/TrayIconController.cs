@@ -19,7 +19,7 @@ public sealed class TrayIconController : System.IDisposable
     private readonly IUpdateService _updates;
     private readonly IToastSender _toasts;
 
-    private PopupWindow? _popup;
+    private WidgetsBoardWindow? _popup;
     private PreferencesWindow? _prefsWindow;
     private AboutWindow? _aboutWindow;
     private FloatingPanelWindow? _floatingWindow;
@@ -118,9 +118,9 @@ public sealed class TrayIconController : System.IDisposable
     private void OnShowPopupRequested(object? sender, System.EventArgs e)
     {
         if (_popup is { IsVisible: true }) { _popup.Hide(); return; }
-        _popup ??= new PopupWindow { DataContext = _panelVm };
-        PositionPopup(_popup);
-        _popup.Show();
+        _popup ??= new WidgetsBoardWindow { DataContext = _panelVm };
+        _popup.Show();      // realize layout so ActualHeight is known
+        PositionBoard(_popup);
         _popup.Activate();
     }
 
@@ -204,12 +204,14 @@ public sealed class TrayIconController : System.IDisposable
         return $"Last checked: {(int)ago.TotalDays}d ago";
     }
 
-    private static void PositionPopup(PopupWindow popup)
+    private static void PositionBoard(WidgetsBoardWindow board)
     {
-        GetCursorPos(out var pt);
+        // Anchor bottom-left of work area with an 8px gutter. ActualHeight
+        // is only meaningful after Show() has run a layout pass.
         var work = SystemParameters.WorkArea;
-        popup.Left = System.Math.Clamp(pt.X, work.Left, work.Right - 320);
-        popup.Top = System.Math.Clamp(pt.Y, work.Top, work.Bottom - 200);
+        var height = board.ActualHeight > 0 ? board.ActualHeight : 600;
+        board.Left = work.Left + 8;
+        board.Top = System.Math.Max(work.Top + 8, work.Bottom - height - 8);
     }
 
     public void Dispose()
