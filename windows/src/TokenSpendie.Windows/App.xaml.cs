@@ -72,8 +72,7 @@ public partial class App : Application
     {
         if (e.PropertyName != nameof(PreferencesStore.LaunchAtLogin)) return;
         if (_startup is null || _preferences is null) return;
-        if (_preferences.LaunchAtLogin && !_startup.IsEnabled()) _startup.Enable();
-        else if (!_preferences.LaunchAtLogin && _startup.IsEnabled()) _startup.Disable();
+        StartupReconciler.Reconcile(_preferences.LaunchAtLogin, _startup);
     }
 
     private async void App_Exit(object sender, ExitEventArgs e)
