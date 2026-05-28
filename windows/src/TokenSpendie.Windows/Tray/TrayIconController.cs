@@ -23,6 +23,11 @@ public sealed class TrayIconController : System.IDisposable
     private PreferencesWindow? _prefsWindow;
     private AboutWindow? _aboutWindow;
     private FloatingPanelWindow? _floatingWindow;
+    private MenuItem? _lastCheckedItem;
+
+    private System.EventHandler? _openPrefsHandler;
+    private System.EventHandler? _openAboutHandler;
+    private System.EventHandler? _checkForUpdatesHandler;
 
     public TrayIconController(
         TrayIconViewModel vm,
@@ -57,10 +62,14 @@ public sealed class TrayIconController : System.IDisposable
         _icon.LeftClickCommand = _vm.LeftClickCommand;
         _icon.ContextMenu = BuildContextMenu();
 
+        _openPrefsHandler = (_, _) => OpenPreferences();
+        _openAboutHandler = (_, _) => OpenAbout();
+        _checkForUpdatesHandler = async (_, _) => await OnCheckForUpdatesAsync().ConfigureAwait(false);
+
         _vm.ShowPopupRequested += OnShowPopupRequested;
-        _vm.OpenPreferencesRequested += (_, _) => OpenPreferences();
-        _vm.OpenAboutRequested += (_, _) => OpenAbout();
-        _vm.CheckForUpdatesRequested += async (_, _) => await OnCheckForUpdatesAsync().ConfigureAwait(false);
+        _vm.OpenPreferencesRequested += _openPrefsHandler;
+        _vm.OpenAboutRequested += _openAboutHandler;
+        _vm.CheckForUpdatesRequested += _checkForUpdatesHandler;
 
         _preferences.PropertyChanged += OnPrefsChanged;
 
@@ -75,8 +84,19 @@ public sealed class TrayIconController : System.IDisposable
         menu.Items.Add(new MenuItem { Header = "Refresh", Command = _vm.RefreshCommand });
         menu.Items.Add(new MenuItem { Header = "Preferences…", Command = _vm.OpenPreferencesCommand });
         menu.Items.Add(new MenuItem { Header = "About", Command = _vm.OpenAboutCommand });
+        _lastCheckedItem = new MenuItem
+        {
+            Header = FormatLastChecked(_preferences.LastUpdateCheck),
+            IsEnabled = false,
+        };
+        menu.Items.Add(_lastCheckedItem);
         menu.Items.Add(new MenuItem { Header = "Check for updates…", Command = _vm.CheckForUpdatesCommand });
         menu.Items.Add(new Separator());
+        menu.Opened += (_, _) =>
+        {
+            if (_lastCheckedItem is not null)
+                _lastCheckedItem.Header = FormatLastChecked(_preferences.LastUpdateCheck);
+        };
         var launchItem = new MenuItem
         {
             Header = "Launch at login",
@@ -173,6 +193,17 @@ public sealed class TrayIconController : System.IDisposable
         }
     }
 
+    internal static string FormatLastChecked(System.DateTimeOffset? when)
+    {
+        if (when is null) return "Last checked: never";
+        var ago = System.DateTimeOffset.UtcNow - when.Value;
+        if (ago < System.TimeSpan.Zero) return "Last checked: just now";
+        if (ago < System.TimeSpan.FromMinutes(1)) return "Last checked: just now";
+        if (ago < System.TimeSpan.FromHours(1)) return $"Last checked: {(int)ago.TotalMinutes}m ago";
+        if (ago < System.TimeSpan.FromDays(1)) return $"Last checked: {(int)ago.TotalHours}h ago";
+        return $"Last checked: {(int)ago.TotalDays}d ago";
+    }
+
     private static void PositionPopup(PopupWindow popup)
     {
         GetCursorPos(out var pt);
@@ -183,6 +214,12 @@ public sealed class TrayIconController : System.IDisposable
 
     public void Dispose()
     {
+        _vm.ShowPopupRequested -= OnShowPopupRequested;
+        if (_openPrefsHandler is not null) _vm.OpenPreferencesRequested -= _openPrefsHandler;
+        if (_openAboutHandler is not null) _vm.OpenAboutRequested -= _openAboutHandler;
+        if (_checkForUpdatesHandler is not null) _vm.CheckForUpdatesRequested -= _checkForUpdatesHandler;
+        _preferences.PropertyChanged -= OnPrefsChanged;
+
         _icon.Dispose();
         _popup?.Close();
         _prefsWindow?.Close();
