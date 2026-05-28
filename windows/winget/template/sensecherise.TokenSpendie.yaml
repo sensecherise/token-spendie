@@ -1,0 +1,12 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.6.0.schema.json
+#
+# Token Spendie — WinGet version manifest template.
+# This file is a snapshot of the manifest structure we submit to
+# microsoft/winget-pkgs. CI regenerates this manifest fresh on each
+# stable release via wingetcreate; the file here is documentation only.
+
+PackageIdentifier: sensecherise.TokenSpendie
+PackageVersion: 0.0.0   # placeholder — CI overrides per release
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.6.0

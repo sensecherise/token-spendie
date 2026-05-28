@@ -34,6 +34,17 @@ Install Token Spendie:
 
 ## Installing on Windows
 
+### Via WinGet (recommended)
+
+    winget install sensecherise.TokenSpendie
+
+WinGet downloads the latest signed installer and installs it under
+`%LocalAppData%\TokenSpendie\` (per-user, no admin required). Updates can be
+applied via `winget upgrade sensecherise.TokenSpendie` or from inside the app
+(right-click tray → **Check for updates…**).
+
+### Direct download
+
 Download the latest installer from
 [Releases](https://github.com/sensecherise/token-spendie/releases/latest):
 

@@ -160,3 +160,118 @@ jobs:
           name: velopack-signed-${{ steps.ver.outputs.version }}
           path: windows/releases/
           retention-days: 30
+
+  submit-winget:
+    name: Submit to WinGet (stable tags only)
+    needs: release
+    runs-on: windows-latest
+    timeout-minutes: 20
+    # Only submit stable releases. Any tag containing "-" (e.g. v1.0.0-rc1,
+    # v1.0.0-beta) is treated as a prerelease and skipped. Matches the
+    # behaviour of Velopack's GithubSource(prerelease: false) — we only
+    # advertise non-prerelease builds via WinGet.
+    if: success() && !contains(github.ref_name, '-')
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Extract version from tag
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v(\d+\.\d+\.\d+)$') {
+            Write-Error "Stable tag '$tag' does not match v<major.minor.patch>"
+            exit 1
+          }
+          $version = $Matches[1]
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Stable version: $version"
+
+      - name: Compute installer URL
+        id: url
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $url = "https://github.com/sensecherise/token-spendie/releases/download/$tag/TokenSpendie.Windows-win-Setup.exe"
+          Write-Host "Installer URL: $url"
+          try {
+            $resp = Invoke-WebRequest -Uri $url -Method Head -MaximumRedirection 5 -ErrorAction Stop
+            Write-Host "HEAD status: $($resp.StatusCode)"
+          } catch {
+            Write-Error "Installer URL not reachable: $url"
+            Write-Error $_.Exception.Message
+            exit 1
+          }
+          "url=$url" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Download wingetcreate (pinned version)
+        id: wc
+        shell: pwsh
+        run: |
+          $wcVersion = "v1.12.8.0"
+          $wcUrl = "https://github.com/microsoft/winget-create/releases/download/$wcVersion/wingetcreate.exe"
+          $wcPath = Join-Path $env:RUNNER_TEMP "wingetcreate.exe"
+          Invoke-WebRequest -Uri $wcUrl -OutFile $wcPath
+          "path=$wcPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Check whether package already exists in winget-pkgs
+        id: exists
+        shell: pwsh
+        run: |
+          $wc = "${{ steps.wc.outputs.path }}"
+          & $wc show sensecherise.TokenSpendie 2>&1 | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            Write-Host "Package found — will run 'wingetcreate update'."
+            "mode=update" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          } else {
+            Write-Host "Package not found — will run 'wingetcreate submit' from template."
+            "mode=new" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          }
+
+      - name: Submit to WinGet (update existing package)
+        if: steps.exists.outputs.mode == 'update'
+        shell: pwsh
+        run: |
+          $wc = "${{ steps.wc.outputs.path }}"
+          & $wc update sensecherise.TokenSpendie `
+            --version ${{ steps.ver.outputs.version }} `
+            --urls "${{ steps.url.outputs.url }}" `
+            --submit `
+            --token "${{ secrets.WINGET_PAT }}"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "wingetcreate update failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
+
+      - name: Submit to WinGet (new package — first stable release only)
+        if: steps.exists.outputs.mode == 'new'
+        shell: pwsh
+        run: |
+          $wc = "${{ steps.wc.outputs.path }}"
+          $stage = Join-Path $env:RUNNER_TEMP "winget-stage\manifests\s\sensecherise\TokenSpendie\${{ steps.ver.outputs.version }}"
+          New-Item -ItemType Directory -Force -Path $stage | Out-Null
+          # Copy templates and substitute placeholder fields with real values.
+          Get-ChildItem windows/winget/template -Filter "*.yaml" | ForEach-Object {
+            $content = Get-Content $_.FullName -Raw
+            $content = $content -replace 'PackageVersion: 0\.0\.0', "PackageVersion: ${{ steps.ver.outputs.version }}"
+            $content = $content -replace 'ReleaseDate: 2026-05-28', "ReleaseDate: $(Get-Date -Format 'yyyy-MM-dd')"
+            $content = $content -replace 'InstallerUrl: https://example\.invalid/placeholder\.exe', "InstallerUrl: ${{ steps.url.outputs.url }}"
+            Set-Content -Path (Join-Path $stage $_.Name) -Value $content
+          }
+          # Compute SHA256 of the signed installer and patch into the staged installer manifest.
+          $installerPath = Join-Path $env:RUNNER_TEMP "installer.exe"
+          Invoke-WebRequest -Uri "${{ steps.url.outputs.url }}" -OutFile $installerPath
+          $sha = (Get-FileHash $installerPath -Algorithm SHA256).Hash
+          $installerYaml = Join-Path $stage "sensecherise.TokenSpendie.installer.yaml"
+          (Get-Content $installerYaml -Raw) -replace 'InstallerSha256: 0{64}', "InstallerSha256: $sha" |
+            Set-Content -Path $installerYaml
+          & $wc submit $stage `
+            --token "${{ secrets.WINGET_PAT }}"
+          if ($LASTEXITCODE -ne 0) {
+            Write-Error "wingetcreate submit (new) failed with exit code $LASTEXITCODE"
+            exit $LASTEXITCODE
+          }
