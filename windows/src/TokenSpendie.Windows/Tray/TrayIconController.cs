@@ -16,6 +16,8 @@ public sealed class TrayIconController : System.IDisposable
     private readonly PreferencesStore _preferences;
     private readonly PreferencesViewModel _prefsVm;
     private readonly FloatingPanelViewModel _floatingVm;
+    private readonly IUpdateService _updates;
+    private readonly IToastSender _toasts;
 
     private PopupWindow? _popup;
     private PreferencesWindow? _prefsWindow;
@@ -27,13 +29,17 @@ public sealed class TrayIconController : System.IDisposable
         DetailPanelViewModel panelVm,
         PreferencesStore preferences,
         PreferencesViewModel prefsVm,
-        FloatingPanelViewModel floatingVm)
+        FloatingPanelViewModel floatingVm,
+        IUpdateService updates,
+        IToastSender toasts)
     {
         _vm = vm;
         _panelVm = panelVm;
         _preferences = preferences;
         _prefsVm = prefsVm;
         _floatingVm = floatingVm;
+        _updates = updates;
+        _toasts = toasts;
 
         _icon = new TaskbarIcon
         {
@@ -54,6 +60,7 @@ public sealed class TrayIconController : System.IDisposable
         _vm.ShowPopupRequested += OnShowPopupRequested;
         _vm.OpenPreferencesRequested += (_, _) => OpenPreferences();
         _vm.OpenAboutRequested += (_, _) => OpenAbout();
+        _vm.CheckForUpdatesRequested += async (_, _) => await OnCheckForUpdatesAsync().ConfigureAwait(false);
 
         _preferences.PropertyChanged += OnPrefsChanged;
 
@@ -68,6 +75,7 @@ public sealed class TrayIconController : System.IDisposable
         menu.Items.Add(new MenuItem { Header = "Refresh", Command = _vm.RefreshCommand });
         menu.Items.Add(new MenuItem { Header = "Preferences…", Command = _vm.OpenPreferencesCommand });
         menu.Items.Add(new MenuItem { Header = "About", Command = _vm.OpenAboutCommand });
+        menu.Items.Add(new MenuItem { Header = "Check for updates…", Command = _vm.CheckForUpdatesCommand });
         menu.Items.Add(new Separator());
         var launchItem = new MenuItem
         {
@@ -116,6 +124,27 @@ public sealed class TrayIconController : System.IDisposable
         }
         _aboutWindow.Show();
         _aboutWindow.Activate();
+    }
+
+    private async System.Threading.Tasks.Task OnCheckForUpdatesAsync()
+    {
+        var result = await _updates.CheckAndApplyAsync().ConfigureAwait(false);
+        _preferences.LastUpdateCheck = System.DateTimeOffset.UtcNow;
+
+        var (title, body) = result switch
+        {
+            UpdateCheckResult.UpdateDownloaded => ("Update ready",
+                "Token Spendie will switch to the new version next time it starts."),
+            UpdateCheckResult.NoUpdate => ("Up to date",
+                "You're on the latest version."),
+            UpdateCheckResult.NotInstalled => ("Update not available",
+                "This build wasn't installed via the official installer."),
+            UpdateCheckResult.UpdateAvailable => ("Update available",
+                "Couldn't download the update right now. Try again later."),
+            _ => ("Update check failed",
+                "Couldn't reach the update server."),
+        };
+        _toasts.SendInformational(title, body);
     }
 
     private void OnPrefsChanged(object? sender, PropertyChangedEventArgs e)

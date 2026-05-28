@@ -21,6 +21,7 @@ public partial class TrayIconViewModel : ObservableObject
     public event System.EventHandler? ShowPopupRequested;
     public event System.EventHandler? OpenPreferencesRequested;
     public event System.EventHandler? OpenAboutRequested;
+    public event System.EventHandler? CheckForUpdatesRequested;
 
     public TrayIconViewModel(UsageStore store, PreferencesStore? preferences = null)
     {
@@ -60,6 +61,9 @@ public partial class TrayIconViewModel : ObservableObject
 
     [RelayCommand]
     private void OpenAbout() => OpenAboutRequested?.Invoke(this, System.EventArgs.Empty);
+
+    [RelayCommand]
+    private void CheckForUpdates() => CheckForUpdatesRequested?.Invoke(this, System.EventArgs.Empty);
 
     [RelayCommand]
     private void ToggleLaunchAtLogin()

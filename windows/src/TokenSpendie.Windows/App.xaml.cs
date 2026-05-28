@@ -20,6 +20,11 @@ public partial class App : Application
 
     private void App_Startup(object sender, StartupEventArgs e)
     {
+        // MUST be first. Velopack uses this hook to handle install / uninstall /
+        // first-run / update commands passed on the command line. If any UI is
+        // touched before Run() the updater behaves incorrectly.
+        Velopack.VelopackApp.Build().Run();
+
         AumidRegistrar.Register();
 
         _preferences = new PreferencesStore();
@@ -30,7 +35,9 @@ public partial class App : Application
         _network = new NetworkAvailabilityObserver();
         _power = new PowerEventObserver();
 
-        _notifier = new UsageNotifier(new WinRtToastSender());
+        var toastSender = new WinRtToastSender();
+        _notifier = new UsageNotifier(toastSender);
+        var updateSvc = new VelopackUpdateService("https://github.com/sensecherise/token-spendie");
 
         var providers = new IUsageProvider[]
         {
@@ -50,7 +57,7 @@ public partial class App : Application
         var panelVm = new DetailPanelViewModel(_store);
         var prefsVm = new PreferencesViewModel(_preferences);
         var floatingVm = new FloatingPanelViewModel(_preferences, panelVm);
-        _tray = new TrayIconController(trayVm, panelVm, _preferences, prefsVm, floatingVm);
+        _tray = new TrayIconController(trayVm, panelVm, _preferences, prefsVm, floatingVm, updateSvc, toastSender);
     }
 
     private void OnStorePropertyChanged(object? sender, PropertyChangedEventArgs e)

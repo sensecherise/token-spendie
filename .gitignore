@@ -2,5 +2,6 @@
 .DS_Store
 .build/
 build/
+!windows/build/
 Resources/AppIcon-1024.png
 docs/

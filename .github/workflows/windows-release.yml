@@ -1,0 +1,162 @@
+name: Windows Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  DOTNET_NOLOGO: true
+
+jobs:
+  release:
+    name: Build, pack, sign, publish
+    runs-on: windows-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Extract version from tag
+        id: ver
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v(\d+\.\d+\.\d+(?:-[A-Za-z0-9.]+)?)$') {
+            Write-Error "Tag '$tag' does not match v<semver>"
+            exit 1
+          }
+          $version = $Matches[1]
+          "version=$version" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+          Write-Host "Version: $version"
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Cache NuGet packages
+        uses: actions/cache@v4
+        with:
+          path: ~/.nuget/packages
+          key: ${{ runner.os }}-nuget-${{ hashFiles('**/*.csproj', '**/*.props', '.config/dotnet-tools.json') }}
+          restore-keys: |
+            ${{ runner.os }}-nuget-
+
+      - name: Restore tools
+        run: dotnet tool restore
+
+      - name: Restore solution
+        run: dotnet restore windows/TokenSpendie.Windows.sln
+
+      - name: Build (Release)
+        run: >
+          dotnet build windows/TokenSpendie.Windows.sln -c Release --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+
+      - name: Test (Release)
+        run: dotnet test windows/TokenSpendie.Windows.sln -c Release --no-build
+
+      - name: Publish self-contained win-x64
+        run: >
+          dotnet publish windows/src/TokenSpendie.Windows/TokenSpendie.Windows.csproj
+          -c Release -r win-x64 --self-contained true
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:PublishSingleFile=false
+          -o windows/src/TokenSpendie.Windows/bin/Release/net8.0-windows10.0.17763/publish
+
+      - name: Render release notes
+        id: notes
+        shell: pwsh
+        run: |
+          $version = "${{ steps.ver.outputs.version }}"
+          $template = Get-Content windows/build/velopack/releasenotes-template.md -Raw
+          $notes = $template.Replace("{version}", $version)
+          $notesPath = "windows/build/velopack/releasenotes-rendered.md"
+          $notes | Out-File -FilePath $notesPath -Encoding utf8
+          "path=$notesPath" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
+
+      - name: Velopack pack (unsigned, pre-signing)
+        run: >
+          dotnet tool run vpk -- pack
+          --packId "TokenSpendie.Windows"
+          --packTitle "Token Spendie"
+          --packAuthors "nong.seng"
+          --packVersion ${{ steps.ver.outputs.version }}
+          --packDir windows/src/TokenSpendie.Windows/bin/Release/net8.0-windows10.0.17763/publish
+          --mainExe "TokenSpendie.Windows.exe"
+          --icon "windows/build/icon/AppIcon.ico"
+          --releaseNotes "${{ steps.notes.outputs.path }}"
+          --outputDir windows/releases
+
+      - name: Zip unsigned artifacts for SignPath
+        shell: pwsh
+        run: |
+          Compress-Archive -Path windows/releases/* -DestinationPath windows/releases-bundle.zip
+
+      - name: Upload unsigned bundle as artifact (SignPath input)
+        id: upload-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: velopack-unsigned-${{ steps.ver.outputs.version }}
+          path: windows/releases-bundle.zip
+          retention-days: 7
+
+      - name: Submit signing request to SignPath
+        id: signpath
+        uses: signpath/github-action-submit-signing-request@v1.1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ secrets.SIGNPATH_ORG_ID }}
+          project-slug: ${{ secrets.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ secrets.SIGNPATH_POLICY_SLUG }}
+          artifact-configuration-slug: "release-zip"
+          github-artifact-id: ${{ steps.upload-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: windows/releases-signed
+
+      - name: Unzip signed bundle back into releases/
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force windows/releases
+          Expand-Archive -Path windows/releases-signed/releases-bundle.zip -DestinationPath windows/releases
+
+      - name: Verify signature on installer
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem windows/releases -Filter "*Setup*.exe" | Select-Object -First 1
+          if (-not $installer) { Write-Error "No installer found in windows/releases"; exit 1 }
+          $sig = Get-AuthenticodeSignature $installer.FullName
+          Write-Host "Signature status: $($sig.Status)"
+          Write-Host "Signer: $($sig.SignerCertificate.Subject)"
+          if ($sig.Status -ne "Valid") {
+            Write-Error "Installer signature is not Valid: $($sig.Status)"
+            exit 1
+          }
+
+      - name: Velopack upload to GitHub Release
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >
+          dotnet tool run vpk -- upload github
+          --repoUrl "https://github.com/sensecherise/token-spendie"
+          --publish
+          --releaseName "Token Spendie ${{ steps.ver.outputs.version }}"
+          --tag ${{ github.ref_name }}
+          --token ${{ secrets.GITHUB_TOKEN }}
+          --outputDir windows/releases
+
+      - name: Upload signed artifacts to workflow run (for audit)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: velopack-signed-${{ steps.ver.outputs.version }}
+          path: windows/releases/
+          retention-days: 30

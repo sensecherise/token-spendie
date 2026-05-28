@@ -22,6 +22,7 @@ public sealed class PreferencesStore : INotifyPropertyChanged
     private double? _floatingPanelTop;
     private double _floatingPanelWidth = 260;
     private double _floatingPanelHeight = 220;
+    private DateTimeOffset? _lastUpdateCheck;
 
     public bool ShowMenuBar { get => _showMenuBar; set => SetAndPersist(ref _showMenuBar, value); }
     public bool ShowFloatingPanel { get => _showFloatingPanel; set => SetAndPersist(ref _showFloatingPanel, value); }
@@ -33,6 +34,7 @@ public sealed class PreferencesStore : INotifyPropertyChanged
     public double? FloatingPanelTop { get => _floatingPanelTop; set => SetAndPersist(ref _floatingPanelTop, value); }
     public double FloatingPanelWidth { get => _floatingPanelWidth; set => SetAndPersist(ref _floatingPanelWidth, value); }
     public double FloatingPanelHeight { get => _floatingPanelHeight; set => SetAndPersist(ref _floatingPanelHeight, value); }
+    public DateTimeOffset? LastUpdateCheck { get => _lastUpdateCheck; set => SetAndPersist(ref _lastUpdateCheck, value); }
 
     public PreferencesStore() : this(DefaultPath()) { }
 
@@ -67,6 +69,7 @@ public sealed class PreferencesStore : INotifyPropertyChanged
             _floatingPanelTop = dto.FloatingPanelTop;
             _floatingPanelWidth = dto.FloatingPanelWidth ?? _floatingPanelWidth;
             _floatingPanelHeight = dto.FloatingPanelHeight ?? _floatingPanelHeight;
+            _lastUpdateCheck = dto.LastUpdateCheck;
         }
         catch { /* defaults survive */ }
     }
@@ -89,6 +92,7 @@ public sealed class PreferencesStore : INotifyPropertyChanged
                 FloatingPanelTop = _floatingPanelTop,
                 FloatingPanelWidth = _floatingPanelWidth,
                 FloatingPanelHeight = _floatingPanelHeight,
+                LastUpdateCheck = _lastUpdateCheck,
             };
             using var stream = File.Create(_path);
             JsonSerializer.Serialize(stream, dto, JsonOptions);
@@ -130,5 +134,6 @@ public sealed class PreferencesStore : INotifyPropertyChanged
         public double? FloatingPanelTop { get; set; }
         public double? FloatingPanelWidth { get; set; }
         public double? FloatingPanelHeight { get; set; }
+        public DateTimeOffset? LastUpdateCheck { get; set; }
     }
 }
