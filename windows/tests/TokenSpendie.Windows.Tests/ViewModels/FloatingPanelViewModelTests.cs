@@ -28,11 +28,11 @@ public class FloatingPanelViewModelTests : IDisposable
     }
 
     [Fact]
-    public void DefaultSizeIs260By220()
+    public void DefaultSizeIs540By420()
     {
         var vm = new FloatingPanelViewModel(Prefs(), panelVm: null!);
-        vm.Width.Should().Be(260);
-        vm.Height.Should().Be(220);
+        vm.Width.Should().Be(540);
+        vm.Height.Should().Be(420);
     }
 
     [Fact]

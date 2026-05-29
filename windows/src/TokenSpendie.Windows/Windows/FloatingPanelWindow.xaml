@@ -5,7 +5,7 @@
         Title="Token Spendie"
         WindowStyle="None" ResizeMode="CanResizeWithGrip" ShowInTaskbar="False"
         AllowsTransparency="True" Background="Transparent" Topmost="True"
-        MinWidth="240" MinHeight="160"
+        MinWidth="420" MinHeight="280"
         WindowStartupLocation="CenterScreen">
   <Border CornerRadius="12" Background="#1E1E22" Padding="0" MouseLeftButtonDown="Border_MouseLeftButtonDown">
     <Border.Effect>
