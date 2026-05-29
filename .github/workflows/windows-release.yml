@@ -17,6 +17,12 @@ jobs:
     name: Build, pack, sign, publish
     runs-on: windows-latest
     timeout-minutes: 45
+    env:
+      # Steps that depend on optional secrets gate on these flags so the
+      # workflow ships unsigned + skips WinGet when the secrets aren't set.
+      # Add the underlying secrets in repo Settings -> Secrets -> Actions
+      # to enable signing + WinGet submission without editing the YAML.
+      HAS_SIGNPATH: ${{ secrets.SIGNPATH_API_TOKEN != '' }}
 
     steps:
       - name: Checkout
@@ -97,11 +103,13 @@ jobs:
           --outputDir windows/releases
 
       - name: Zip unsigned artifacts for SignPath
+        if: env.HAS_SIGNPATH == 'true'
         shell: pwsh
         run: |
           Compress-Archive -Path windows/releases/* -DestinationPath windows/releases-bundle.zip
 
       - name: Upload unsigned bundle as artifact (SignPath input)
+        if: env.HAS_SIGNPATH == 'true'
         id: upload-unsigned
         uses: actions/upload-artifact@v4
         with:
@@ -110,6 +118,7 @@ jobs:
           retention-days: 7
 
       - name: Submit signing request to SignPath
+        if: env.HAS_SIGNPATH == 'true'
         id: signpath
         uses: signpath/github-action-submit-signing-request@v1.1
         with:
@@ -123,12 +132,14 @@ jobs:
           output-artifact-directory: windows/releases-signed
 
       - name: Unzip signed bundle back into releases/
+        if: env.HAS_SIGNPATH == 'true'
         shell: pwsh
         run: |
           Remove-Item -Recurse -Force windows/releases
           Expand-Archive -Path windows/releases-signed/releases-bundle.zip -DestinationPath windows/releases
 
       - name: Verify signature on installer
+        if: env.HAS_SIGNPATH == 'true'
         shell: pwsh
         run: |
           $installer = Get-ChildItem windows/releases -Filter "*Setup*.exe" | Select-Object -First 1
@@ -171,6 +182,10 @@ jobs:
     # behaviour of Velopack's GithubSource(prerelease: false) — we only
     # advertise non-prerelease builds via WinGet.
     if: success() && !contains(github.ref_name, '-')
+    env:
+      # When WINGET_PAT is not configured the per-step gates below skip the
+      # submission cleanly so the workflow doesn't fail closed.
+      HAS_WINGET: ${{ secrets.WINGET_PAT != '' }}
 
     steps:
       - name: Checkout
@@ -233,7 +248,7 @@ jobs:
           }
 
       - name: Submit to WinGet (update existing package)
-        if: steps.exists.outputs.mode == 'update'
+        if: steps.exists.outputs.mode == 'update' && env.HAS_WINGET == 'true'
         shell: pwsh
         run: |
           $wc = "${{ steps.wc.outputs.path }}"
@@ -248,7 +263,7 @@ jobs:
           }
 
       - name: Submit to WinGet (new package — first stable release only)
-        if: steps.exists.outputs.mode == 'new'
+        if: steps.exists.outputs.mode == 'new' && env.HAS_WINGET == 'true'
         shell: pwsh
         run: |
           $wc = "${{ steps.wc.outputs.path }}"
