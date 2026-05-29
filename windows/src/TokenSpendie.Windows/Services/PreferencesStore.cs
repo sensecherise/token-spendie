@@ -20,8 +20,8 @@ public sealed class PreferencesStore : INotifyPropertyChanged
     private ProviderID _menuBarProviderID = ProviderID.Claude;
     private double? _floatingPanelLeft;
     private double? _floatingPanelTop;
-    private double _floatingPanelWidth = 260;
-    private double _floatingPanelHeight = 220;
+    private double _floatingPanelWidth = 540;
+    private double _floatingPanelHeight = 420;
     private DateTimeOffset? _lastUpdateCheck;
 
     public bool ShowMenuBar { get => _showMenuBar; set => SetAndPersist(ref _showMenuBar, value); }

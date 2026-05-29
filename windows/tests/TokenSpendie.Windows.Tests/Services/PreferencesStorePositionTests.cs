@@ -20,11 +20,11 @@ public class PreferencesStorePositionTests : IDisposable
     public void Dispose() { try { Directory.Delete(_dir, recursive: true); } catch { } }
 
     [Fact]
-    public void DefaultFloatingPanelSizeIs260x220()
+    public void DefaultFloatingPanelSizeIs540x420()
     {
         var p = new PreferencesStore(_path);
-        p.FloatingPanelWidth.Should().Be(260);
-        p.FloatingPanelHeight.Should().Be(220);
+        p.FloatingPanelWidth.Should().Be(540);
+        p.FloatingPanelHeight.Should().Be(420);
         p.FloatingPanelLeft.Should().BeNull();
         p.FloatingPanelTop.Should().BeNull();
     }
