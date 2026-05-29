@@ -2,6 +2,9 @@
   <PropertyGroup>
     <IsPackable>false</IsPackable>
     <RootNamespace>TokenSpendie.Windows.Tests</RootNamespace>
+    <!-- Bumped from inherited 17763 so tests can ProjectReference the widget
+         provider (which targets 19041 for the Widgets SDK). -->
+    <TargetFramework>net8.0-windows10.0.19041.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.10.0" />
@@ -12,5 +15,13 @@
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\TokenSpendie.Windows\TokenSpendie.Windows.csproj" />
+    <!-- WidgetProvider re-compiles Data/Models source via linked Compile (to keep
+         the MSIX free of TokenSpendie.Windows's WPF assets). Both assemblies
+         therefore define TokenSpendie.Windows.Models.* — referencing both from a
+         single test project triggers CS0433. The widget test files use
+         `extern alias widget;` to disambiguate. -->
+    <ProjectReference Include="..\..\src\TokenSpendie.WidgetProvider\TokenSpendie.WidgetProvider.csproj">
+      <Aliases>widget</Aliases>
+    </ProjectReference>
   </ItemGroup>
 </Project>

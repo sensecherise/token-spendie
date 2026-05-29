@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Package
+  xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
+  xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
+  xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
+  xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
+  IgnorableNamespaces="uap uap3 com rescap">
+
+  <Identity
+    Name="Sensecherise.TokenSpendie.WidgetProvider"
+    Publisher="CN=SignPath OSS"
+    Version="1.0.0.0"
+    ProcessorArchitecture="x64" />
+
+  <Properties>
+    <DisplayName>Token Spendie Widgets</DisplayName>
+    <PublisherDisplayName>nong.seng</PublisherDisplayName>
+    <Logo>assets\StoreLogo.png</Logo>
+  </Properties>
+
+  <Dependencies>
+    <TargetDeviceFamily Name="Windows.Desktop"
+                        MinVersion="10.0.19041.0"
+                        MaxVersionTested="10.0.22621.0" />
+  </Dependencies>
+
+  <Resources>
+    <Resource Language="en-us" />
+  </Resources>
+
+  <Applications>
+    <Application Id="TokenSpendieWidgetProvider"
+                 Executable="TokenSpendie.WidgetProvider.exe"
+                 EntryPoint="Windows.FullTrustApplication">
+      <uap:VisualElements
+        DisplayName="Token Spendie Widgets"
+        Description="Token Spendie widget provider for the Windows 11 Widget Board."
+        BackgroundColor="transparent"
+        Square150x150Logo="assets\Square150x150Logo.png"
+        Square44x44Logo="assets\Square44x44Logo.png"
+        AppListEntry="none" />
+
+      <Extensions>
+
+        <!-- COM activation for the widget-provider class. The Id GUID below
+             MUST equal the [Guid] attribute on WidgetProvider.cs (Task 2 +
+             Task 4). -->
+        <com:Extension Category="windows.comServer">
+          <com:ComServer>
+            <com:ExeServer Executable="TokenSpendie.WidgetProvider.exe"
+                           DisplayName="Token Spendie Widget Provider"
+                           Arguments="-RegisterProcessAsComServer">
+              <com:Class Id="579614A3-768E-46A5-846C-78784B4232A1"
+                         DisplayName="Token Spendie Widget Provider" />
+            </com:ExeServer>
+          </com:ComServer>
+        </com:Extension>
+
+        <!-- Tells the widget host this package serves widgets. -->
+        <uap3:Extension Category="windows.appExtension">
+          <uap3:AppExtension Name="com.microsoft.windows.widgets"
+                             DisplayName="Token Spendie Widgets"
+                             Id="TokenSpendieWidgetExtension"
+                             PublicFolder="Public">
+            <uap3:Properties>
+              <WidgetProvider>
+                <ProviderIcons>
+                  <Icon Path="assets\Square44x44Logo.png" />
+                </ProviderIcons>
+
+                <Activation>
+                  <CreateInstance ClassId="579614A3-768E-46A5-846C-78784B4232A1" />
+                </Activation>
+
+                <Definitions>
+
+                  <Definition Id="TokenSpendie.Session"
+                              DisplayName="Token Spendie — Session"
+                              Description="Current 5-hour session usage at a glance."
+                              AllowMultiple="false"
+                              IsCustomizable="false">
+                    <Capabilities>
+                      <Capability>
+                        <Size Name="small" />
+                      </Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="assets\Square44x44Logo.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="assets\Widget-Session-preview.png"
+                                    DisplayAltText="Token Spendie session widget preview" />
+                      </Screenshots>
+                    </ThemeResources>
+                  </Definition>
+
+                  <Definition Id="TokenSpendie.Full"
+                              DisplayName="Token Spendie — Full"
+                              Description="Session and weekly usage with breakdown."
+                              AllowMultiple="false"
+                              IsCustomizable="false">
+                    <Capabilities>
+                      <Capability>
+                        <Size Name="medium" />
+                      </Capability>
+                    </Capabilities>
+                    <ThemeResources>
+                      <Icons>
+                        <Icon Path="assets\Square44x44Logo.png" />
+                      </Icons>
+                      <Screenshots>
+                        <Screenshot Path="assets\Widget-Full-preview.png"
+                                    DisplayAltText="Token Spendie full widget preview" />
+                      </Screenshots>
+                    </ThemeResources>
+                  </Definition>
+
+                </Definitions>
+              </WidgetProvider>
+            </uap3:Properties>
+          </uap3:AppExtension>
+        </uap3:Extension>
+
+      </Extensions>
+    </Application>
+  </Applications>
+
+  <Capabilities>
+    <rescap:Capability Name="runFullTrust" />
+  </Capabilities>
+
+</Package>
