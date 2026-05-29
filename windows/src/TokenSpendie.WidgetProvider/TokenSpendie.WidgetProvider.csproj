@@ -20,6 +20,12 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
     <AppxManifest>Package.appxmanifest</AppxManifest>
+    <!-- Skip auto-initialization of the WindowsAppSDK DeploymentManager.
+         The auto-initializer runs at type-load time and throws
+         REGDB_E_CLASSNOTREG when the xUnit runner loads the widget
+         provider assembly (unpackaged context). The widget provider is
+         launched by the widget host inside the MSIX, so deployment is
+         already handled by the package framework reference. -->
     <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
 
     <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
