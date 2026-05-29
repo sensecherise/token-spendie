@@ -18,7 +18,9 @@ public partial class FloatingPanelWindow : Window
         _vm = vm;
         DataContext = vm;
         Width = vm.Width;
-        Height = vm.Height;
+        // Height is content-driven via SizeToContent="Height"; vm.Height is
+        // ignored. We still persist Height on close for forward-compat, but
+        // it won't be reapplied as long as SizeToContent stays set.
         if (vm.Left is { } l && vm.Top is { } t)
         {
             WindowStartupLocation = WindowStartupLocation.Manual;
