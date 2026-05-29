@@ -152,17 +152,29 @@ jobs:
             exit 1
           }
 
-      - name: Velopack upload to GitHub Release
+      - name: Upload Velopack artifacts to existing GitHub Release
+        # vpk's own `upload github` errors when a release for the same tag
+        # already exists, which is the steady state here because the mac
+        # workflow (ci-pipeline.yaml) creates the release first via
+        # softprops/action-gh-release. gh release upload --clobber attaches
+        # files to whatever release exists (or fails clean if none) without
+        # trying to recreate it.
+        shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >
-          dotnet tool run vpk -- upload github
-          --repoUrl "https://github.com/sensecherise/token-spendie"
-          --publish
-          --releaseName "Token Spendie ${{ steps.ver.outputs.version }}"
-          --tag ${{ github.ref_name }}
-          --token ${{ secrets.GITHUB_TOKEN }}
-          --outputDir windows/releases
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $tag = "${{ github.ref_name }}"
+          # Ensure a release exists. If macOS hasn't fired yet, create one
+          # with just the tag; macOS upload --clobber will add its assets.
+          gh release view $tag *> $null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "Token Spendie ${{ steps.ver.outputs.version }}" --generate-notes
+            if ($LASTEXITCODE -ne 0) { throw "release create exit $LASTEXITCODE" }
+          }
+          $files = Get-ChildItem windows/releases -File | ForEach-Object { $_.FullName }
+          if (-not $files) { throw "No files in windows/releases to upload." }
+          gh release upload $tag $files --clobber
+          if ($LASTEXITCODE -ne 0) { throw "gh release upload exit $LASTEXITCODE" }
 
       - name: Upload signed artifacts to workflow run (for audit)
         if: always()
