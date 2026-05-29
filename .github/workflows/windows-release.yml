@@ -258,6 +258,9 @@ jobs:
             Write-Host "Package not found — will run 'wingetcreate submit' from template."
             "mode=new" | Out-File -FilePath $env:GITHUB_OUTPUT -Append
           }
+          # `wingetcreate show <missing>` exits non-zero. PowerShell carries
+          # that into the step's exit code. Reset so the step succeeds.
+          $global:LASTEXITCODE = 0
 
       - name: Submit to WinGet (update existing package)
         if: steps.exists.outputs.mode == 'update' && env.HAS_WINGET == 'true'
