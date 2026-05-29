@@ -100,8 +100,8 @@ if (-not $cert) {
 $pfxDir = Join-Path $repo "windows\releases\widget-sideload"
 New-Item -ItemType Directory -Force -Path $pfxDir | Out-Null
 $pfxPath = Join-Path $pfxDir "sideload-cert.pfx"
-$pwd = ConvertTo-SecureString -String "tokenspendie-local" -Force -AsPlainText
-Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pwd | Out-Null
+$pfxPassword = ConvertTo-SecureString -String "tokenspendie-local" -Force -AsPlainText
+Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pfxPassword | Out-Null
 Write-Host "PFX: $pfxPath"
 
 # 3. Trust in LocalMachine\TrustedPeople (admin scope)
