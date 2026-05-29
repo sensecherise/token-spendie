@@ -1,0 +1,32 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.6.0.schema.json
+
+PackageIdentifier: sensecherise.TokenSpendie
+PackageVersion: 0.0.0   # placeholder — CI overrides per release
+PackageLocale: en-US
+Publisher: sensecherise
+PublisherUrl: https://github.com/sensecherise
+PublisherSupportUrl: https://github.com/sensecherise/token-spendie/issues
+Author: nong.seng
+PackageName: Token Spendie
+PackageUrl: https://github.com/sensecherise/token-spendie
+License: MIT
+LicenseUrl: https://github.com/sensecherise/token-spendie/blob/main/LICENSE
+Copyright: "© 2026 nong.seng"
+ShortDescription: Claude Code / Gemini CLI token usage tracker in the Windows system tray.
+Description: |
+  Claude Code / Gemini CLI token usage tracker that lives in the Windows system
+  tray. Displays current session usage as a ring icon and exposes a detail panel
+  with weekly + per-model breakdowns. Auto-updates via the official installer.
+Moniker: tokenspendie
+Tags:
+  - claude
+  - gemini
+  - cli
+  - tokens
+  - usage
+  - tray
+  - monitoring
+  - llm
+ReleaseNotesUrl: https://github.com/sensecherise/token-spendie/releases
+ManifestType: defaultLocale
+ManifestVersion: 1.6.0
