@@ -9,23 +9,17 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <LangVersion>12</LangVersion>
-    <!-- WPF is enabled for RingPngRenderer's System.Windows.Media drawing.
-         Adds ~6 MB to the MSIX vs ~System.Drawing — accepted for crisper
-         output. WPF is included via the SDK target framework; no extra
-         PackageReference required. -->
-    <UseWPF>true</UseWPF>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <NoWarn>$(NoWarn);CA1416</NoWarn>
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
+    <UseWPF>true</UseWPF>
 
-    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <Platforms>x64</Platforms>
     <EnableMsixTooling>true</EnableMsixTooling>
     <AppxPackage>true</AppxPackage>
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
     <AppxManifest>Package.appxmanifest</AppxManifest>
-    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
 
     <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
     <AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Replace($(Version), '[-+].*$', '')).0</AssemblyVersion>
@@ -39,8 +33,6 @@
     <PackageReference Include="AdaptiveCards.Templating" Version="1.5.0" />
   </ItemGroup>
 
-  <!-- Re-use Data + Models from the main app via linked Compile. A project
-       reference would drag WPF + tray dependencies into the MSIX. -->
   <ItemGroup>
     <Using Include="System.IO" />
     <Using Include="System.Net.Http" />
@@ -58,7 +50,6 @@
     <Compile Include="..\TokenSpendie.Windows\Data\OAuthCredentials.cs"         Link="Data\OAuthCredentials.cs" />
     <Compile Include="..\TokenSpendie.Windows\Data\OAuthCredentialsParser.cs"   Link="Data\OAuthCredentialsParser.cs" />
     <Compile Include="..\TokenSpendie.Windows\Data\UsageDecoder.cs"             Link="Data\UsageDecoder.cs" />
-    <!-- Models glob, minus Theme.cs (WPF System.Windows.Media.Color). -->
     <Compile Include="..\TokenSpendie.Windows\Models\*.cs"                      Link="Models\%(FileName).cs"
              Exclude="..\TokenSpendie.Windows\Models\Theme.cs" />
   </ItemGroup>
@@ -73,9 +64,6 @@
     <Content Include="assets\**\*.*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <!-- Card templates are embedded so CardRenderer can read them via
-         Assembly.GetManifestResourceStream regardless of who launches the
-         assembly (widget host process, dev sideload, xUnit runner, etc). -->
     <EmbeddedResource Include="Cards\*.json" />
   </ItemGroup>
 

@@ -5,7 +5,7 @@
   xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:com="http://schemas.microsoft.com/appx/manifest/com/windows10"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap uap3 com rescap">
+  IgnorableNamespaces="uap uap3 rescap">
 
   <Identity
     Name="Sensecherise.TokenSpendie.WidgetProvider"
@@ -20,9 +20,8 @@
   </Properties>
 
   <Dependencies>
-    <TargetDeviceFamily Name="Windows.Desktop"
-                        MinVersion="10.0.19041.0"
-                        MaxVersionTested="10.0.22621.0" />
+    <TargetDeviceFamily Name="Windows.Universal" MinVersion="10.0.19041.0" MaxVersionTested="10.0.22621.0" />
+    <TargetDeviceFamily Name="Windows.Desktop"   MinVersion="10.0.19041.0" MaxVersionTested="10.0.22621.0" />
   </Dependencies>
 
   <Resources>
@@ -30,22 +29,18 @@
   </Resources>
 
   <Applications>
-    <Application Id="TokenSpendieWidgetProvider"
+    <Application Id="App"
                  Executable="TokenSpendie.WidgetProvider.exe"
-                 EntryPoint="Windows.FullTrustApplication">
+                 EntryPoint="TokenSpendie.WidgetProvider.Program">
       <uap:VisualElements
         DisplayName="Token Spendie Widgets"
         Description="Token Spendie widget provider for the Windows 11 Widget Board."
         BackgroundColor="transparent"
         Square150x150Logo="assets\Square150x150Logo.png"
-        Square44x44Logo="assets\Square44x44Logo.png"
-        AppListEntry="none" />
+        Square44x44Logo="assets\Square44x44Logo.png" />
 
       <Extensions>
 
-        <!-- COM activation for the widget-provider class. The Id GUID below
-             MUST equal the [Guid] attribute on WidgetProvider.cs (Task 2 +
-             Task 4). -->
         <com:Extension Category="windows.comServer">
           <com:ComServer>
             <com:ExeServer Executable="TokenSpendie.WidgetProvider.exe"
@@ -57,7 +52,6 @@
           </com:ComServer>
         </com:Extension>
 
-        <!-- Tells the widget host this package serves widgets. -->
         <uap3:Extension Category="windows.appExtension">
           <uap3:AppExtension Name="com.microsoft.windows.widgets"
                              DisplayName="Token Spendie Widgets"
@@ -129,6 +123,7 @@
 
   <Capabilities>
     <rescap:Capability Name="runFullTrust" />
+    <rescap:Capability Name="broadFileSystemAccess" />
   </Capabilities>
 
 </Package>
