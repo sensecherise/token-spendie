@@ -206,12 +206,15 @@ public sealed class TrayIconController : System.IDisposable
 
     private static void PositionBoard(WidgetsBoardWindow board)
     {
-        // Anchor bottom-left of work area with an 8px gutter. ActualHeight
-        // is only meaningful after Show() has run a layout pass.
-        var work = SystemParameters.WorkArea;
+        // ActualWidth / ActualHeight are only meaningful after Show() has
+        // run a layout pass. Width fallback matches WidgetsBoardWindow.xaml's
+        // declared Width="520".
+        var work   = SystemParameters.WorkArea;
+        var width  = board.ActualWidth  > 0 ? board.ActualWidth  : 520;
         var height = board.ActualHeight > 0 ? board.ActualHeight : 600;
-        board.Left = work.Left + 8;
-        board.Top = System.Math.Max(work.Top + 8, work.Bottom - height - 8);
+        var (left, top) = TrayPositioning.BottomRight(work, width, height);
+        board.Left = left;
+        board.Top  = top;
     }
 
     public void Dispose()
