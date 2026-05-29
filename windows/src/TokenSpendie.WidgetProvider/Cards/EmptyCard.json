@@ -1,0 +1,26 @@
+{
+  "type": "AdaptiveCard",
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "version": "1.5",
+  "body": [
+    {
+      "type": "TextBlock",
+      "text": "Token Spendie",
+      "weight": "Bolder",
+      "size": "Medium"
+    },
+    {
+      "type": "TextBlock",
+      "text": "No CLI detected.",
+      "weight": "Bolder",
+      "spacing": "Small"
+    },
+    {
+      "type": "TextBlock",
+      "text": "Install Claude Code or Gemini CLI to start tracking usage.",
+      "isSubtle": true,
+      "wrap": true,
+      "spacing": "Small"
+    }
+  ]
+}

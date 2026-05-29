@@ -9,13 +9,18 @@ public sealed class CardRenderer
 {
     private readonly Lazy<string> _sessionTemplate = new(() => LoadTemplate("SessionCard.json"));
     private readonly Lazy<string> _fullTemplate = new(() => LoadTemplate("FullCard.json"));
+    private readonly Lazy<string> _emptyTemplate = new(() => LoadTemplate("EmptyCard.json"));
 
-    public string Render(string kind, string size, UsageSnapshot snapshot) => kind switch
+    public string Render(string kind, string size, UsageSnapshot snapshot)
     {
-        "TokenSpendie.Session" => RenderSession(snapshot),
-        "TokenSpendie.Full" => RenderFull(snapshot, size),
-        _ => RenderError($"Unknown widget kind: {kind}"),
-    };
+        if (IsEmpty(snapshot)) return _emptyTemplate.Value;
+        return kind switch
+        {
+            "TokenSpendie.Session" => RenderSession(snapshot),
+            "TokenSpendie.Full" => RenderFull(snapshot, size),
+            _ => RenderError($"Unknown widget kind: {kind}"),
+        };
+    }
 
     public string RenderSession(UsageSnapshot snapshot)
     {
@@ -68,6 +73,9 @@ public sealed class CardRenderer
         return System.Text.Json.JsonSerializer.Serialize(card);
     }
 
+    private static bool IsEmpty(UsageSnapshot s) =>
+        s.Session.Percent == 0 && s.Weekly.Percent == 0 && s.ModelWeeklies.Count == 0;
+
     private static string FormatFooter(UsageSnapshot snapshot)
     {
         var ago = DateTimeOffset.UtcNow - snapshot.FetchedAt;
@@ -79,8 +87,6 @@ public sealed class CardRenderer
 
     private static string LoadTemplate(string name)
     {
-        // Card templates are embedded resources — see the csproj. Default MSBuild
-        // resource ID is "<RootNamespace>.<Directory>.<File>".
         var asm = Assembly.GetExecutingAssembly();
         var resource = $"TokenSpendie.WidgetProvider.Cards.{name}";
         using var stream = asm.GetManifestResourceStream(resource)
