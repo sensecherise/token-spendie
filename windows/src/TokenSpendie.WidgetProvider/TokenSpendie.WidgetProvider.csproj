@@ -20,6 +20,7 @@
     <AppxPackageSigningEnabled>false</AppxPackageSigningEnabled>
     <GenerateAppxPackageOnBuild>false</GenerateAppxPackageOnBuild>
     <AppxManifest>Package.appxmanifest</AppxManifest>
+    <WindowsAppSdkDeploymentManagerInitialize>false</WindowsAppSdkDeploymentManagerInitialize>
 
     <Version Condition="'$(Version)' == ''">0.0.0-dev</Version>
     <AssemblyVersion>$([System.Text.RegularExpressions.Regex]::Replace($(Version), '[-+].*$', '')).0</AssemblyVersion>
