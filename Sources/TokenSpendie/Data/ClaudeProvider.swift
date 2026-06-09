@@ -28,9 +28,10 @@ struct ClaudeProvider: UsageProvider {
         do {
             usage = try await endpoint.fetchUsage(accessToken: creds.accessToken)
         } catch ProviderError.unauthorized {
-            // Re-read the Keychain once — Claude Code refreshes the token
-            // during normal use — then retry.
-            let refreshed = try credentials.loadCredentials()
+            // Bypass cache — Claude Code refreshes the token during normal use;
+            // loadFreshCredentials() re-reads from the source Keychain item so
+            // the rotated token is picked up and the cache is updated.
+            let refreshed = try credentials.loadFreshCredentials()
             usage = try await endpoint.fetchUsage(accessToken: refreshed.accessToken)
         }
         return Self.convert(usage)
