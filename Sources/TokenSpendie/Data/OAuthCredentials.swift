@@ -43,7 +43,17 @@ enum OAuthCredentialsParser {
 /// Abstraction over credential storage so the store can be tested without the Keychain.
 protocol CredentialStore {
     func loadCredentials() throws -> OAuthCredentials
+    /// Bypass any credential cache and re-read from the authoritative source.
+    /// Used by the 401 retry path so a freshly rotated token is picked up.
+    func loadFreshCredentials() throws -> OAuthCredentials
     /// True if the credential item exists, without reading its secret data —
     /// so it never triggers the Keychain consent prompt.
     func credentialsExist() -> Bool
+}
+
+extension CredentialStore {
+    /// Default: fresh == regular. Overridden by KeychainReader to bypass its cache.
+    func loadFreshCredentials() throws -> OAuthCredentials {
+        try loadCredentials()
+    }
 }
