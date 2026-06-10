@@ -51,6 +51,7 @@ enum LoadState: Equatable {
 enum ProviderID: String, Codable, CaseIterable, Equatable {
     case claude
     case gemini
+    case codex
 }
 
 /// How a window's `resetsAt` is rendered in the panel.
