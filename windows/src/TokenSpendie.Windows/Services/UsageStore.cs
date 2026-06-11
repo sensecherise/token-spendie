@@ -181,6 +181,10 @@ public sealed class UsageStore : INotifyPropertyChanged, IAsyncDisposable
         {
             SetState(LoadState.Error(UsageErrorKind.LoginExpired), id);
         }
+        catch (ProviderReauthRequiredException)
+        {
+            SetState(LoadState.Error(UsageErrorKind.CodexReauthRequired), id);
+        }
         catch (ProviderNetworkException)
         {
             Degrade(UsageErrorKind.Network, id);

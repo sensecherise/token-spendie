@@ -33,7 +33,7 @@ public sealed class CredentialMalformedException : CredentialException
 
 // --- Provider errors ----------------------------------------------------------
 
-public enum ProviderErrorKind { Unauthorized, Network, BadResponse, RateLimited }
+public enum ProviderErrorKind { Unauthorized, ReauthRequired, Network, BadResponse, RateLimited }
 
 public abstract class ProviderException : Exception
 {
@@ -46,6 +46,13 @@ public sealed class ProviderUnauthorizedException : ProviderException
 {
     public override ProviderErrorKind Kind => ProviderErrorKind.Unauthorized;
     public ProviderUnauthorizedException() : base("Endpoint returned 401.") { }
+}
+
+public sealed class ProviderReauthRequiredException : ProviderException
+{
+    public override ProviderErrorKind Kind => ProviderErrorKind.ReauthRequired;
+    public ProviderReauthRequiredException(string cli)
+        : base($"{cli} re-authentication required.") { }
 }
 
 public sealed class ProviderNetworkException : ProviderException
@@ -77,6 +84,7 @@ public enum UsageErrorKind
     ClaudeCodeNotFound,
     CredentialAccessDenied,
     LoginExpired,
+    CodexReauthRequired,
     Network,
     BadResponse,
 }

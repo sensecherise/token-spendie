@@ -4,4 +4,5 @@ public enum ProviderID
 {
     Claude,
     Gemini,
+    Codex,
 }
