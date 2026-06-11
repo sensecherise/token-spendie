@@ -216,4 +216,51 @@ final class CodexProviderTests: XCTestCase {
         let snapshot = try! CodexProvider.decode(data, fetchedAt: Date())
         XCTAssertEqual(snapshot.windows.map(\.label), ["Session · 6h", "14-day"])
     }
+
+    func testProactiveRefreshThenUsage401TriggersSecondRefreshWithRotatedToken() async throws {
+        let store = try freshStore(lastRefresh: "2026-05-01T00:00:00Z") // stale → proactive refresh
+        var refreshTokensSeen: [String] = []
+        var usageCalls = 0
+        let provider = CodexProvider(
+            store: store,
+            transport: { request in
+                let url = request.url!.absoluteString
+                if url.contains("auth.openai.com") {
+                    let body = (try? JSONSerialization.jsonObject(with: request.httpBody ?? Data())) as? [String: Any]
+                    refreshTokensSeen.append(body?["refresh_token"] as? String ?? "?")
+                    let n = refreshTokensSeen.count + 1
+                    let payload = Data(#"{"access_token": "tok-\#(n)", "refresh_token": "ref-\#(n)"}"#.utf8)
+                    return (payload, self.http(200, url: url))
+                }
+                usageCalls += 1
+                if usageCalls == 1 { return (Data(), self.http(401)) }
+                return (Self.usageBody, self.http(200))
+            },
+            now: now)
+        let snapshot = try await provider.fetchUsage()
+
+        XCTAssertEqual(snapshot.plan, "Pro")
+        XCTAssertEqual(usageCalls, 2)
+        // The reactive (second) refresh must use the token rotated in by the
+        // proactive (first) refresh — never the original stale one twice.
+        XCTAssertEqual(refreshTokensSeen, ["ref-1", "ref-2"])
+        XCTAssertEqual(try store.load().refreshToken, "ref-3")
+    }
+
+    func testUsage429ParsesRetryAfterHeader() async throws {
+        let response = HTTPURLResponse(
+            url: URL(string: "https://chatgpt.com/backend-api/wham/usage")!,
+            statusCode: 429, httpVersion: nil,
+            headerFields: ["Retry-After": "120"])!
+        let provider = CodexProvider(
+            store: try freshStore(),
+            transport: { _ in (Data(), response) },
+            now: now)
+        do {
+            _ = try await provider.fetchUsage()
+            XCTFail("expected rateLimited")
+        } catch {
+            XCTAssertEqual(error as? ProviderError, .rateLimited(retryAfter: 120))
+        }
+    }
 }

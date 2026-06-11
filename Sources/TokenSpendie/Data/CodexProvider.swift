@@ -63,6 +63,9 @@ struct CodexProvider: UsageProvider {
         switch response.statusCode {
         case 200:
             return try Self.decode(data, fetchedAt: now())
+        // 403 is treated like 401 (refresh + retry): wham/usage answers 403
+        // for some expired-auth states — deliberate deviation from the Claude
+        // endpoint, which only refreshes on 401.
         case 401, 403:
             throw ProviderError.unauthorized
         case 429:
@@ -145,8 +148,9 @@ struct CodexProvider: UsageProvider {
         }
         guard let headline = windows.first else { throw ProviderError.badResponse }
 
-        let plan = (root["plan_type"] as? String).map { raw in
-            raw.split(separator: "_").map(\.capitalized).joined(separator: " ")
+        let plan = (root["plan_type"] as? String).flatMap { raw -> String? in
+            guard !raw.isEmpty else { return nil }
+            return raw.split(separator: "_").map(\.capitalized).joined(separator: " ")
         }
         return ProviderSnapshot(id: .codex, plan: plan, headline: headline,
                                 windows: windows, fetchedAt: fetchedAt)
