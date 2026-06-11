@@ -88,6 +88,8 @@ public sealed class CodexCredentialsStore
 
     /// <summary>Atomically rewrites <c>auth.json</c> with the refreshed token
     /// set, keeping all fields we do not own.</summary>
+    /// ACLs are inherited from Codex CLI's own file; intentionally not set
+    /// here (the macOS 0600 chmod has no needed Windows equivalent).
     public void Save(CodexCredentials creds, DateTimeOffset refreshedAt)
     {
         JsonObject root;
@@ -113,7 +115,15 @@ public sealed class CodexCredentialsStore
 
         var json = root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
         var tmp = FilePath + ".tmp";
-        File.WriteAllText(tmp, json);
-        File.Move(tmp, FilePath, overwrite: true);
+        try
+        {
+            File.WriteAllText(tmp, json);
+            File.Move(tmp, FilePath, overwrite: true);
+        }
+        catch
+        {
+            try { File.Delete(tmp); } catch { /* best effort */ }
+            throw;
+        }
     }
 }

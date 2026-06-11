@@ -256,4 +256,22 @@ public sealed class CodexProviderTests : IDisposable
         var act = () => client.RefreshAsync(creds);
         await act.Should().ThrowAsync<ProviderReauthRequiredException>();
     }
+
+    [Fact]
+    public void DecodeToleratesDecimalEpochAndNonNumericPercent()
+    {
+        // A decimal-form epoch is legal JSON for the same number; a string
+        // used_percent must skip that window, not kill the payload.
+        var usage = CodexHttpClient.Decode("""
+        {
+          "rate_limit": {
+            "primary_window":   {"used_percent": 15, "reset_at": 1735401600.0, "limit_window_seconds": 18000},
+            "secondary_window": {"used_percent": "broken"}
+          }
+        }
+        """);
+        usage.Primary.Should().NotBeNull();
+        usage.Primary!.ResetsAt.Should().Be(DateTimeOffset.FromUnixTimeSeconds(1735401600));
+        usage.Secondary.Should().BeNull();
+    }
 }

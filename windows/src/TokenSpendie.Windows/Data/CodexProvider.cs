@@ -144,9 +144,7 @@ public sealed class CodexProvider : IUsageProvider
     {
         if (string.IsNullOrEmpty(planType)) return null;
         var parts = planType.Split('_', StringSplitOptions.RemoveEmptyEntries)
-            .Select(part => part.Length == 0
-                ? part
-                : char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant());
+            .Select(part => char.ToUpperInvariant(part[0]) + part[1..].ToLowerInvariant());
         return string.Join(' ', parts);
     }
 }
@@ -264,13 +262,19 @@ public sealed class CodexHttpClient : ICodexUsageEndpoint, ICodexTokenRefresher
 
         var rateLimit = root?["rate_limit"];
 
+        // JSON doesn't distinguish int from float on the wire; read numbers
+        // tolerantly so "1735401600.0" or a non-numeric value degrades to the
+        // field being absent instead of discarding the whole payload.
+        static double? Number(JsonNode? node) =>
+            node is JsonValue value && value.TryGetValue<double>(out var number) ? number : null;
+
         static CodexWindow? Window(JsonNode? raw)
         {
-            if (raw?["used_percent"]?.GetValue<double>() is not { } used) return null;
-            DateTimeOffset? resetsAt = raw["reset_at"]?.GetValue<long>() is { } epoch
-                ? DateTimeOffset.FromUnixTimeSeconds(epoch)
+            if (Number(raw?["used_percent"]) is not { } used) return null;
+            DateTimeOffset? resetsAt = Number(raw?["reset_at"]) is { } reset
+                ? DateTimeOffset.FromUnixTimeSeconds((long)reset)
                 : null;
-            var seconds = raw["limit_window_seconds"]?.GetValue<int>();
+            var seconds = (int?)Number(raw?["limit_window_seconds"]);
             return new CodexWindow(used, resetsAt, seconds);
         }
 
