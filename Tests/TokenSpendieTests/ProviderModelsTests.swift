@@ -54,9 +54,8 @@ final class ProviderModelsTests: XCTestCase {
     }
 
     func testCodexProviderIDRawValueRoundTrips() throws {
-        XCTAssertEqual(ProviderID.codex.rawValue, "codex")
-        let decoded = try JSONDecoder().decode(ProviderID.self,
-                                               from: Data(#""codex""#.utf8))
-        XCTAssertEqual(decoded, .codex)
+        let encoded = try JSONEncoder().encode(ProviderID.codex)
+        XCTAssertEqual(String(data: encoded, encoding: .utf8), "\"codex\"")
+        XCTAssertEqual(try JSONDecoder().decode(ProviderID.self, from: encoded), .codex)
     }
 }
