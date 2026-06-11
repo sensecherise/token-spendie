@@ -71,6 +71,8 @@ final class CodexCredentialsStoreTests: XCTestCase {
         let lastRefresh = creds.lastRefresh!
         XCTAssertFalse(creds.needsRefresh(now: lastRefresh.addingTimeInterval(7 * 86400)))
         XCTAssertTrue(creds.needsRefresh(now: lastRefresh.addingTimeInterval(9 * 86400)))
+        // Exactly 8 days is NOT "older than 8 days" — strict >.
+        XCTAssertFalse(creds.needsRefresh(now: lastRefresh.addingTimeInterval(8 * 86400)))
         let noStamp = CodexCredentials(accessToken: "a", refreshToken: "r",
                                        idToken: nil, accountId: nil, lastRefresh: nil)
         XCTAssertTrue(noStamp.needsRefresh(now: Date()))
@@ -93,6 +95,15 @@ final class CodexCredentialsStoreTests: XCTestCase {
             with: Data(contentsOf: store.fileURL)) as! [String: Any]
         XCTAssertNotNil(raw["future_field"], "unknown top-level fields must survive")
         XCTAssertTrue(raw["OPENAI_API_KEY"] is NSNull, "null API key must survive")
+    }
+
+    func testSaveOnMissingFileCreatesOwnerOnlyPermissions() throws {
+        let store = CodexCredentialsStore(fileURL: dir.appendingPathComponent("auth.json"))
+        let creds = CodexCredentials(accessToken: "a", refreshToken: "r",
+                                     idToken: nil, accountId: nil, lastRefresh: nil)
+        try store.save(creds, refreshedAt: Date())
+        let attrs = try FileManager.default.attributesOfItem(atPath: store.fileURL.path)
+        XCTAssertEqual((attrs[.posixPermissions] as? NSNumber)?.int16Value, 0o600)
     }
 
     func testDefaultURLHonorsCodexHome() {

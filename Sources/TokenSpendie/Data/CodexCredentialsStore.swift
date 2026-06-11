@@ -63,6 +63,9 @@ struct CodexCredentialsStore {
 
     /// Atomically rewrites `auth.json` with the refreshed token set, keeping
     /// all fields we do not own (`OPENAI_API_KEY`, unknown future fields).
+    /// Known limitation: a Codex CLI refresh landing between our read and
+    /// write is clobbered (lost-update race). The window is milliseconds and
+    /// both sides write rotated-valid token sets, but it is not lock-protected.
     func save(_ creds: CodexCredentials, refreshedAt: Date) throws {
         var root: [String: Any] = [:]
         if let data = try? Data(contentsOf: fileURL),
@@ -80,6 +83,10 @@ struct CodexCredentialsStore {
         let data = try JSONSerialization.data(
             withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
         try data.write(to: fileURL, options: .atomic)
+        // A fresh file is created at the process umask (world-readable);
+        // secrets must be owner-only like Codex CLI's own writes.
+        try FileManager.default.setAttributes(
+            [.posixPermissions: 0o600], ofItemAtPath: fileURL.path)
     }
 
     private static let isoFormatter: ISO8601DateFormatter = {
