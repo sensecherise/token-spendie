@@ -52,4 +52,11 @@ final class ProviderModelsTests: XCTestCase {
         let b = ProviderUsage(id: .claude, displayName: "Claude", state: .ok, snapshot: nil)
         XCTAssertNotEqual(a, b)
     }
+
+    func testCodexProviderIDRawValueRoundTrips() throws {
+        XCTAssertEqual(ProviderID.codex.rawValue, "codex")
+        let decoded = try JSONDecoder().decode(ProviderID.self,
+                                               from: Data(#""codex""#.utf8))
+        XCTAssertEqual(decoded, .codex)
+    }
 }

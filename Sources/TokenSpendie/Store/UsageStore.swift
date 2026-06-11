@@ -156,6 +156,8 @@ final class UsageStore: ObservableObject {
             apply(try await provider.fetchUsage(), for: id, displayName: provider.displayName)
         } catch ProviderError.unauthorized {
             setState(.error(.loginExpired), for: id)
+        } catch ProviderError.reauthRequired {
+            setState(.error(.codexReauthRequired), for: id)
         } catch ProviderError.network {
             degrade(to: .network, for: id)
         } catch ProviderError.badResponse {

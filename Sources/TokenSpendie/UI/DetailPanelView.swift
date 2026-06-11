@@ -283,6 +283,8 @@ private func panelMessage(for kind: UsageError) -> some View {
             return ("🔑", "Keychain access needed. The widget reads your Claude login token from the Keychain — click refresh and choose Allow.")
         case .loginExpired:
             return ("⏱", "Login expired. Run any Claude Code command to refresh your session — the widget recovers on its own after that.")
+        case .codexReauthRequired:
+            return ("⏱", "Codex login needed. Run `codex` in a terminal to sign in again — the widget recovers automatically.")
         case .network:
             return ("📡", "Can't reach the usage service. The widget will keep retrying.")
         case .badResponse:
