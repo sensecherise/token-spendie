@@ -160,6 +160,8 @@ final class UsageStore: ObservableObject {
             // Only CodexProvider throws this today; route to per-provider copy
             // (or an associated value) when another provider adopts the path.
             setState(.error(.codexReauthRequired), for: id)
+        } catch ProviderError.notRunning {
+            degrade(to: .antigravityNotRunning, for: id)
         } catch ProviderError.network {
             degrade(to: .network, for: id)
         } catch ProviderError.badResponse {

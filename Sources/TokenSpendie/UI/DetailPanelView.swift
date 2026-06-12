@@ -285,6 +285,8 @@ private func panelMessage(for kind: UsageError) -> some View {
             return ("⏱", "Login expired. Run any Claude Code command to refresh your session — the widget recovers on its own after that.")
         case .codexReauthRequired:
             return ("⏱", "Codex login needed. Run `codex` in a terminal to sign in again — the widget recovers automatically.")
+        case .antigravityNotRunning:
+            return ("🛸", "Antigravity isn't running. Open the Antigravity IDE or run `agy` — usage appears while it's running.")
         case .network:
             return ("📡", "Can't reach the usage service. The widget will keep retrying.")
         case .badResponse:
