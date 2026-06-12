@@ -149,7 +149,10 @@ struct AntigravityProbe: AntigravityProbing {
         let candidates = Self.candidateEndpoints(listeningPorts: ports,
                                                  extensionPort: match.extensionPort,
                                                  csrfToken: match.csrfToken)
-        guard !candidates.isEmpty else { throw ProviderError.notRunning }
+        // The process IS running here — an empty port list (lsof missing or
+        // momentarily no listeners) is "unreachable", not "not running", so
+        // the panel doesn't tell the user to launch an app they have open.
+        guard !candidates.isEmpty else { throw ProviderError.network }
 
         guard let endpoint = await Self.firstReachable(of: candidates) else {
             throw ProviderError.network
