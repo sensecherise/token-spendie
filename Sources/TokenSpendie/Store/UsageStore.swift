@@ -161,6 +161,8 @@ final class UsageStore: ObservableObject {
             // (or an associated value) when another provider adopts the path.
             setState(.error(.codexReauthRequired), for: id)
         } catch ProviderError.notRunning {
+            // Only AntigravityProvider throws this today; same routing debt as
+            // reauthRequired above if another local-process provider adopts it.
             degrade(to: .antigravityNotRunning, for: id)
         } catch ProviderError.network {
             degrade(to: .network, for: id)
