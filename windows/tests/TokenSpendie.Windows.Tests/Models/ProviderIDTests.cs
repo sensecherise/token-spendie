@@ -12,4 +12,11 @@ public class ProviderIDTests
         System.Enum.GetNames<ProviderID>().Should().Contain("Codex");
         UsageErrorKind.CodexReauthRequired.Should().BeDefined();
     }
+
+    [Fact]
+    public void AntigravityCaseExists()
+    {
+        System.Enum.GetNames<ProviderID>().Should().Contain("Antigravity");
+        UsageErrorKind.AntigravityNotRunning.Should().BeDefined();
+    }
 }

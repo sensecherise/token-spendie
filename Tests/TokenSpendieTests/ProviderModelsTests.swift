@@ -58,4 +58,10 @@ final class ProviderModelsTests: XCTestCase {
         XCTAssertEqual(String(data: encoded, encoding: .utf8), "\"codex\"")
         XCTAssertEqual(try JSONDecoder().decode(ProviderID.self, from: encoded), .codex)
     }
+
+    func testAntigravityProviderIDRawValueRoundTrips() throws {
+        let encoded = try JSONEncoder().encode(ProviderID.antigravity)
+        XCTAssertEqual(String(data: encoded, encoding: .utf8), "\"antigravity\"")
+        XCTAssertEqual(try JSONDecoder().decode(ProviderID.self, from: encoded), .antigravity)
+    }
 }
