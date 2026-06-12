@@ -75,7 +75,9 @@ struct AntigravityProvider: UsageProvider {
                   let remaining = (quotaInfo["remainingFraction"] as? NSNumber)?.doubleValue else {
                 return nil
             }
-            let percent = min(max((1 - remaining) * 100, 0), 100)
+            // Lower-bounded only — UsageWindow.percent may exceed 100 by
+            // convention (over-cap), matching the other providers.
+            let percent = max((1 - remaining) * 100, 0)
             let resetsAt = (quotaInfo["resetTime"] as? String).flatMap(Self.parseResetTime)
             return LabeledWindow(label: label, detail: "model quota",
                                  resetStyle: .countdown,
