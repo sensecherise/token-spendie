@@ -30,6 +30,21 @@ internal static class SnapshotFetcher
             return Convert(t.Result);
         }
 
+        var codex = new CodexProvider();
+        if (codex.DetectCredentials())
+        {
+            try
+            {
+                var t = codex.FetchUsageAsync();
+                t.Wait();
+                return Convert(t.Result);
+            }
+            catch
+            {
+                // Fall through to the empty snapshot.
+            }
+        }
+
         return Empty();
     }
 

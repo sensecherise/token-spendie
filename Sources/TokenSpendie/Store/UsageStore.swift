@@ -156,6 +156,10 @@ final class UsageStore: ObservableObject {
             apply(try await provider.fetchUsage(), for: id, displayName: provider.displayName)
         } catch ProviderError.unauthorized {
             setState(.error(.loginExpired), for: id)
+        } catch ProviderError.reauthRequired {
+            // Only CodexProvider throws this today; route to per-provider copy
+            // (or an associated value) when another provider adopts the path.
+            setState(.error(.codexReauthRequired), for: id)
         } catch ProviderError.network {
             degrade(to: .network, for: id)
         } catch ProviderError.badResponse {

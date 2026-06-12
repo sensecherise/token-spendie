@@ -27,6 +27,7 @@ enum UsageError: Error, Equatable {
     case claudeCodeNotFound     // no Keychain item / Claude Code not logged in
     case keychainAccessDenied   // user denied the Keychain access prompt
     case loginExpired           // 401 even after re-reading the Keychain
+    case codexReauthRequired    // Codex 401/refresh failure — user must run `codex`
     case network                // offline / unreachable
     case badResponse            // non-200 or unparseable payload
 }
@@ -34,6 +35,7 @@ enum UsageError: Error, Equatable {
 /// What the data layer's provider/decoder can throw.
 enum ProviderError: Error, Equatable {
     case unauthorized           // HTTP 401
+    case reauthRequired         // credentials unusable and unrefreshable — re-login needed
     case network                // transport failure
     case badResponse            // non-200, or payload could not be decoded
     case rateLimited(retryAfter: TimeInterval?)  // HTTP 429
@@ -51,6 +53,7 @@ enum LoadState: Equatable {
 enum ProviderID: String, Codable, CaseIterable, Equatable {
     case claude
     case gemini
+    case codex
 }
 
 /// How a window's `resetsAt` is rendered in the panel.

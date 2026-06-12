@@ -43,6 +43,7 @@ public partial class App : Application
         {
             new ClaudeProvider(new ClaudeJsonFileReader(), new EndpointUsageProvider()),
             new GeminiProvider(),
+            new CodexProvider(),
         };
         _store = new UsageStore(
             providers,

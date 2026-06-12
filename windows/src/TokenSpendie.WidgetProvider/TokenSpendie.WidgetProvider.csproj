@@ -52,6 +52,8 @@
     <Compile Include="..\TokenSpendie.Windows\Data\ClaudeJsonFileReader.cs"     Link="Data\ClaudeJsonFileReader.cs" />
     <Compile Include="..\TokenSpendie.Windows\Data\GeminiProvider.cs"           Link="Data\GeminiProvider.cs" />
     <Compile Include="..\TokenSpendie.Windows\Data\GeminiUsageReader.cs"        Link="Data\GeminiUsageReader.cs" />
+    <Compile Include="..\TokenSpendie.Windows\Data\CodexProvider.cs"            Link="Data\CodexProvider.cs" />
+    <Compile Include="..\TokenSpendie.Windows\Data\CodexCredentialsStore.cs"    Link="Data\CodexCredentialsStore.cs" />
     <Compile Include="..\TokenSpendie.Windows\Data\EndpointUsageProvider.cs"    Link="Data\EndpointUsageProvider.cs" />
     <Compile Include="..\TokenSpendie.Windows\Data\IClaudeUsageEndpoint.cs"     Link="Data\IClaudeUsageEndpoint.cs" />
     <Compile Include="..\TokenSpendie.Windows\Data\ICredentialReader.cs"        Link="Data\ICredentialReader.cs" />
