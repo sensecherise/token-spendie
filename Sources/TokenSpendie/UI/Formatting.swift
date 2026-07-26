@@ -41,12 +41,13 @@ enum Formatting {
         return "resets \(weekdayDateFormatter.string(from: date))"
     }
 
-    /// "updated just now" / "updated 10s ago" / "updated 5m ago" / "updated 2h ago".
+    /// "updated just now" / "updated 10s ago" / "updated 5m ago" / "updated 2h ago" / "updated 2d ago".
     static func updatedAgo(_ date: Date, now: Date) -> String {
         let elapsed = Int(now.timeIntervalSince(date))
         if elapsed < 3 { return "updated just now" }
         if elapsed < 60 { return "updated \(elapsed)s ago" }
         if elapsed < 3600 { return "updated \(elapsed / 60)m ago" }
-        return "updated \(elapsed / 3600)h ago"
+        if elapsed < 86400 { return "updated \(elapsed / 3600)h ago" }
+        return "updated \(elapsed / 86400)d ago"
     }
 }
