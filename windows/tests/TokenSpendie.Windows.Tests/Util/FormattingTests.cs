@@ -41,4 +41,10 @@ public class FormattingTests
 
     [Fact] public void UpdatedAgoHours() =>
         Formatting.UpdatedAgo(Now.AddHours(-2), Now).Should().Be("updated 2h ago");
+
+    [Fact] public void UpdatedAgoHoursCapsBelowOneDay() =>
+        Formatting.UpdatedAgo(Now.AddHours(-23), Now).Should().Be("updated 23h ago");
+
+    [Fact] public void UpdatedAgoDays() =>
+        Formatting.UpdatedAgo(Now.AddDays(-2), Now).Should().Be("updated 2d ago");
 }

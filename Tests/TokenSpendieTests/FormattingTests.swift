@@ -26,5 +26,8 @@ final class FormattingTests: XCTestCase {
         XCTAssertEqual(Formatting.updatedAgo(Date(timeIntervalSince1970: 990), now: now), "updated 10s ago")
         XCTAssertEqual(Formatting.updatedAgo(Date(timeIntervalSince1970: 700), now: now), "updated 5m ago")
         XCTAssertEqual(Formatting.updatedAgo(now, now: now), "updated just now")
+        let dayNow = Date(timeIntervalSince1970: 3 * 86400)
+        XCTAssertEqual(Formatting.updatedAgo(dayNow.addingTimeInterval(-23 * 3600), now: dayNow), "updated 23h ago")
+        XCTAssertEqual(Formatting.updatedAgo(dayNow.addingTimeInterval(-2 * 86400), now: dayNow), "updated 2d ago")
     }
 }

@@ -27,6 +27,7 @@ public static class Formatting
         if (elapsed < 3) return "updated just now";
         if (elapsed < 60) return $"updated {elapsed}s ago";
         if (elapsed < 3600) return $"updated {elapsed / 60}m ago";
-        return $"updated {elapsed / 3600}h ago";
+        if (elapsed < 86400) return $"updated {elapsed / 3600}h ago";
+        return $"updated {elapsed / 86400}d ago";
     }
 }
